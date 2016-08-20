@@ -20,6 +20,6 @@ public final class ReconciliationPhase extends DefaultPhase {
     private ReconciliationPhase(Reconciler reconciler, TaskStatusProvider taskProvider) {
         super(UUID.randomUUID(),
                 "Reconciliation",
-                Arrays.asList(ReconciliationBlock.create(reconciler, taskProvider)));
+                Arrays.asList(ReconciliationBlock.create(reconciler)));
     }
 }

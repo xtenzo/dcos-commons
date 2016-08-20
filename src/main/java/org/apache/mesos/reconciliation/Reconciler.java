@@ -3,7 +3,6 @@ package org.apache.mesos.reconciliation;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.SchedulerDriver;
 
-import java.util.Collection;
 import java.util.Set;
 
 /**
@@ -13,14 +12,11 @@ import java.util.Set;
 public interface Reconciler {
 
     /**
-     * Starts reconciliation against the provided tasks, which should represent what the Scheduler
-     * currently knows about task status.
+     * Starts reconciliation which should represent what the Scheduler currently knows about task status.
      * <p>
      * NOTE: THIS CALL MUST BE THREAD-SAFE AGAINST OTHER RECONCILER CALLS
-     *
-     * @param tasks Current set of tasks known by the Scheduler, which will be reconciled with Mesos
      */
-    void start(final Collection<TaskStatus> tasks);
+    void start();
 
     /**
      * Triggers any needed reconciliation against the provided {@code driver}. This call is expected

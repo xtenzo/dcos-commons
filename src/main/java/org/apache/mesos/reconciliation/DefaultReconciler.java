@@ -6,7 +6,9 @@ import com.google.inject.Singleton;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.offer.TaskException;
 import org.apache.mesos.offer.TaskUtils;
+import org.apache.mesos.state.StateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +21,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Singleton
 public class DefaultReconciler implements Reconciler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultReconciler.class);
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+    private final StateStore stateStore;
 
     // Exponential backoff between explicit reconcile requests: minimum 8s, maximum 30s
     private static final int MULTIPLIER = 2;
@@ -33,24 +36,29 @@ public class DefaultReconciler implements Reconciler {
     private long lastRequestTimeMs;
     private long backOffMs;
 
-    public DefaultReconciler() {
-        resetTimerValues();
+    public DefaultReconciler(StateStore stateStore) {
+        this.stateStore = stateStore;
     }
 
     @Override
-    public void start(final Collection<Protos.TaskStatus> tasks) {
-        // append provided tasks to current state
+    public void start() {
+        resetTimerValues();
+
+        // Append provided tasks to current state
         synchronized (unreconciled) {
-            for (TaskStatus status : tasks) {
-                if (!TaskUtils.isTerminated(status)) {
+            Collection<TaskStatus> taskStatuses = stateStore.fetchStatuses();
+
+            for (TaskStatus status : taskStatuses) {
+                if (!TaskUtils.isTerminated(status) && !isTransient(status)) {
                     unreconciled.put(status.getTaskId().getValue(), status);
                 }
             }
-            // even if the scheduler thinks no tasks are launched, we should still always perform
+
+            // Even if the scheduler thinks no tasks are launched, we should still always perform
             // implicit reconciliation:
             isImplicitReconciliationTriggered.set(false);
-            LOGGER.info("Added {} unreconciled tasks to reconciler: {} tasks to reconcile",
-                    tasks.size(), unreconciled.size());
+            logger.info("Added {} unreconciled tasks to reconciler: {} tasks to reconcile",
+                    taskStatuses.size(), unreconciled.size());
         }
     }
 
@@ -85,21 +93,21 @@ public class DefaultReconciler implements Reconciler {
                     long newBackoff = backOffMs * MULTIPLIER;
                     backOffMs = Math.min(newBackoff > 0 ? newBackoff : 0, MAX_BACKOFF_MS);
 
-                    LOGGER.info("Triggering explicit reconciliation of {} remaining tasks, next "
+                    logger.info("Triggering explicit reconciliation of {} remaining tasks, next "
                             + "explicit reconciliation in {}ms or later",
                             unreconciled.size(), backOffMs);
                     // pass a COPY of the list, in case driver is doing anything with it..:
                     driver.reconcileTasks(ImmutableList.copyOf(unreconciled.values()));
                 } else {
                     // timer has not expired yet, do nothing for this call
-                    LOGGER.info("Too soon since last explicit reconciliation trigger. Waiting at "
+                    logger.info("Too soon since last explicit reconciliation trigger. Waiting at "
                             + "least {}ms before next explicit reconciliation ({} remaining tasks)",
                             lastRequestTimeMs + backOffMs - nowMs, unreconciled.size());
                 }
             } else {
                 // PHASE 2: no unreconciled tasks remain, trigger a single implicit reconciliation,
                 // where we get the list of all tasks currently known to Mesos.
-                LOGGER.info("Triggering implicit final reconciliation of all tasks");
+                logger.info("Triggering implicit final reconciliation of all tasks");
                 driver.reconcileTasks(Collections.<TaskStatus>emptyList());
 
                 // reset the timer values in case we're start()ed again in the future
@@ -114,7 +122,7 @@ public class DefaultReconciler implements Reconciler {
         synchronized (unreconciled) {
             // we've gotten a task status update callback. mark this task as reconciled, if needed
             unreconciled.remove(status.getTaskId().getValue());
-            LOGGER.info("Reconciled task: {} ({} remaining tasks)",
+            logger.info("Reconciled task: {} ({} remaining tasks)",
                     status.getTaskId().getValue(), unreconciled.size());
         }
     }
@@ -131,7 +139,7 @@ public class DefaultReconciler implements Reconciler {
         // YOLO: wipe state. this may result in inconsistent task state between Mesos and Framework
         synchronized (unreconciled) {
             if (!unreconciled.isEmpty()) {
-                LOGGER.warn("Discarding {} remaining unreconciled tasks due to Force Complete call",
+                logger.warn("Discarding {} remaining unreconciled tasks due to Force Complete call",
                         unreconciled.size());
             }
             unreconciled.clear();
@@ -155,5 +163,16 @@ public class DefaultReconciler implements Reconciler {
     private void resetTimerValues() {
         lastRequestTimeMs = 0;
         backOffMs = BASE_BACKOFF_MS;
+    }
+
+    private boolean isTransient(TaskStatus taskStatus) {
+        try {
+            Protos.TaskInfo taskInfo = stateStore.fetchTask(TaskUtils.toTaskName(taskStatus.getTaskId()));
+            return TaskUtils.isTransient(taskInfo);
+        } catch (TaskException e) {
+            logger.error("Failed to determine whether a TaskInfo was transient or not with exception: ", e);
+            // Returning a TaskInfo as NOT transient does no harm as Mesos will report the Task as unknown.
+            return false;
+        }
     }
 }

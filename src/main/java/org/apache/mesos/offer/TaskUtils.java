@@ -1,16 +1,12 @@
 package org.apache.mesos.offer;
 
-import java.util.*;
-
 import com.google.protobuf.ByteString;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Label;
-import org.apache.mesos.Protos.Labels;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskInfo;
-import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.Protos.*;
 import org.apache.mesos.config.ConfigStore;
+
+import java.util.*;
 
 /**
  * Various utility methods for manipulating data in {@link TaskInfo}s.
@@ -95,6 +91,21 @@ public class TaskUtils {
     taskBuilder.clearLabels();
     taskBuilder.setLabels(clearedLabels);
     return taskBuilder.build();
+  }
+
+  /**
+   * Determines whether a TaskInfo represent a transient task slot or is a Task to be launched or reconciled.
+   * @param taskInfo The TaskInfo which may or may not represent a transient task slot.
+   * @return True if the TaskInfo represents a transient task slot, false otherwise.
+   */
+  public static boolean isTransient(TaskInfo taskInfo) {
+    Optional<Label> transientLabel = getLabel(taskInfo, MesosTask.TRANSIENT_FLAG_KEY);
+
+    if (transientLabel.isPresent()) {
+      return Boolean.valueOf(transientLabel.get().getValue());
+    } else {
+      return false;
+    }
   }
 
   /**
@@ -219,5 +230,19 @@ public class TaskUtils {
 
     final Protos.TaskStatus taskStatus = builder.build();
     driver.sendStatusUpdate(taskStatus);
+  }
+
+  private static Optional<Label> getLabel(TaskInfo taskInfo, String labelKey) {
+    if (!taskInfo.hasLabels()) {
+      return Optional.empty();
+    }
+
+    for (Label label : taskInfo.getLabels().getLabelsList()) {
+      if (label.getKey().equals(labelKey)) {
+        return Optional.of(label);
+      }
+    }
+
+    return Optional.empty();
   }
 }
