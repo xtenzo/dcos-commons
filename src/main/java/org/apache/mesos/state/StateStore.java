@@ -142,7 +142,7 @@ public interface StateStore {
      * @throws StateStoreException if no data was found for the requested name, or if fetching the TaskInfo otherwise
      *                             fails
      */
-    TaskInfo fetchTask(String taskName) throws StateStoreException;
+    Optional<TaskInfo> fetchTask(String taskName) throws StateStoreException;
 
 
     /**

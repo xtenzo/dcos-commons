@@ -95,7 +95,7 @@ public class DefaultScheduler implements Scheduler {
     private List<TaskSpecification> getTaskSpecifications(TaskSpecification taskSpecification, Integer count) {
         List<TaskSpecification> taskSpecifications = new ArrayList<>();
 
-        for (int i=0; i<count; i++) {
+        for (int i = 0; i < count; i++) {
             taskSpecifications.add(
                     new DefaultTaskSpecification(
                             taskSpecification.getName() + "-" + i,

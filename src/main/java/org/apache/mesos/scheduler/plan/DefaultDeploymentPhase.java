@@ -1,5 +1,6 @@
 package org.apache.mesos.scheduler.plan;
 
+import org.apache.mesos.offer.OfferRequirement;
 import org.apache.mesos.scheduler.TaskKiller;
 import org.apache.mesos.state.StateStore;
 
@@ -38,9 +39,19 @@ public class DefaultDeploymentPhase extends DefaultPhase {
         Collection<Block> blocks = new ArrayList<>();
 
         for (TaskSpecification taskSpecification : taskSpecifications) {
-            blocks.add(new DefaultBlock(taskSpecification, taskKiller, stateStore));
+            OfferRequirement offerRequirement = getOfferRequirement(taskSpecification, stateStore);
+            blocks.add(new DefaultBlock(taskSpecification, taskKiller, offerRequirement));
         }
 
         return blocks;
+    }
+
+    private static OfferRequirement getOfferRequirement(TaskSpecification taskSpecification, StateStore stateStore) {
+        //if (stateStore.fetchTask(taskSpecification.getName()))
+        return null;
+    }
+
+    private static OfferRequirement getNewOfferRequirement(TaskSpecification taskSpecification) {
+        return null;
     }
 }

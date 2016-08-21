@@ -166,12 +166,18 @@ public class DefaultReconciler implements Reconciler {
     }
 
     private boolean isTransient(TaskStatus taskStatus) {
+        // Returning a TaskInfo as NOT transient in error cases does no harm as Mesos will report the Task as unknown.
         try {
-            Protos.TaskInfo taskInfo = stateStore.fetchTask(TaskUtils.toTaskName(taskStatus.getTaskId()));
-            return TaskUtils.isTransient(taskInfo);
+            Optional<Protos.TaskInfo> optionalTaskInfo =
+                    stateStore.fetchTask(TaskUtils.toTaskName(taskStatus.getTaskId()));
+
+            if (optionalTaskInfo.isPresent()) {
+                return TaskUtils.isTransient(optionalTaskInfo.get());
+            } else {
+                return false;
+            }
         } catch (TaskException e) {
             logger.error("Failed to determine whether a TaskInfo was transient or not with exception: ", e);
-            // Returning a TaskInfo as NOT transient does no harm as Mesos will report the Task as unknown.
             return false;
         }
     }

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * Created by gabriel on 8/20/16.
@@ -23,9 +24,13 @@ public class DefaultFailureListener implements TaskFailureListener {
     @Override
     public void taskFailed(Protos.TaskID taskId) {
         try {
-            Protos.TaskInfo taskInfo = stateStore.fetchTask(TaskUtils.toTaskName(taskId));
-            taskInfo = FailureUtils.markFailed(taskInfo);
-            stateStore.storeTasks(Arrays.asList(taskInfo));
+            Optional<Protos.TaskInfo> optionalTaskInfo = stateStore.fetchTask(TaskUtils.toTaskName(taskId));
+            if (optionalTaskInfo.isPresent()) {
+                Protos.TaskInfo taskInfo = FailureUtils.markFailed(optionalTaskInfo.get());
+                stateStore.storeTasks(Arrays.asList(taskInfo));
+            } else {
+                logger.error("TaskInfo for TaskID was not present in the StateStore: " + taskId);
+            }
         } catch (TaskException e) {
             logger.error("Failed to fetch Task for taskId: " + taskId + " with exception:", e);
         }

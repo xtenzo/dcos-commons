@@ -3,7 +3,6 @@ package org.apache.mesos.scheduler.plan;
 import org.apache.mesos.Protos;
 import org.apache.mesos.offer.OfferRequirement;
 import org.apache.mesos.scheduler.TaskKiller;
-import org.apache.mesos.state.StateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,14 +13,16 @@ import java.util.UUID;
  */
 public class DefaultBlock implements Block {
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private Status status = Status.PENDING;
     private final UUID blockId = UUID.randomUUID();
     private final TaskSpecification taskSpecification;
     private final TaskKiller taskKiller;
+    private final OfferRequirement offerRequirement;
+    private Status status = Status.PENDING;
 
-    public DefaultBlock(TaskSpecification taskSpecification, TaskKiller taskKiller, StateStore stateStore) {
+    public DefaultBlock(TaskSpecification taskSpecification, TaskKiller taskKiller, OfferRequirement offerRequirement) {
         this.taskSpecification = taskSpecification;
         this.taskKiller = taskKiller;
+        this.offerRequirement = offerRequirement;
     }
 
     @Override

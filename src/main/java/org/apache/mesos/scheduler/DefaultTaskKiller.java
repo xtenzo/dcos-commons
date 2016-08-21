@@ -16,9 +16,9 @@ public class DefaultTaskKiller implements TaskKiller {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final TaskFailureListener taskFailureListener;
 
-    private final Integer restartLock = 0;
+    private final Object restartLock = new Object();
     private List<Protos.TaskInfo> tasksToRestart = new ArrayList<>();
-    private final Integer rescheduleLock = 0;
+    private final Object rescheduleLock = new Object();
     private List<Protos.TaskInfo> tasksToReschedule = new ArrayList<>();
 
     public DefaultTaskKiller(TaskFailureListener taskFailureListener) {

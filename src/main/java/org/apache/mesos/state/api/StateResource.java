@@ -1,6 +1,7 @@
 package org.apache.mesos.state.api;
 
 import com.googlecode.protobuf.format.JsonFormat;
+import org.apache.mesos.Protos;
 import org.apache.mesos.state.StateStore;
 import org.json.JSONArray;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * A read-only API for accessing task and frameworkId state from persistent storage.
@@ -87,8 +89,13 @@ public class StateResource {
     public Response getTaskInfo(@PathParam("taskName") String taskName) {
         try {
             logger.info("Attempting to fetch TaskInfo for task '{}'", taskName);
-            return Response.ok(new JsonFormat().printToString(stateStore.fetchTask(taskName)),
-                    MediaType.APPLICATION_JSON).build();
+            Optional<Protos.TaskInfo> optionalTaskInfo = stateStore.fetchTask(taskName);
+            if (optionalTaskInfo.isPresent()) {
+                return Response.ok(new JsonFormat().printToString(optionalTaskInfo.get()),
+                        MediaType.APPLICATION_JSON).build();
+            } else {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
         } catch (Exception ex) {
             // Warning instead of Error: Subject to user input
             logger.warn(String.format(

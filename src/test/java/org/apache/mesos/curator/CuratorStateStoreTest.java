@@ -9,6 +9,7 @@ import org.apache.mesos.state.StateStore;
 import org.apache.mesos.state.StateStoreException;
 import org.apache.mesos.storage.CuratorPersister;
 import org.apache.mesos.testing.CuratorTestUtils;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -97,15 +98,15 @@ public class CuratorStateStoreTest {
     public void testStoreFetchTask() throws Exception {
         Protos.TaskInfo testTask = createTask(TASK_NAME);
         store.storeTasks(Arrays.asList(testTask));
-        assertEquals(testTask, store.fetchTask(TASK_NAME));
+        assertEquals(testTask, store.fetchTask(TASK_NAME).get());
         Collection<Protos.TaskInfo> outTasks = store.fetchTasks();
         assertEquals(1, outTasks.size());
         assertEquals(testTask, outTasks.iterator().next());
     }
 
-    @Test(expected=StateStoreException.class)
+    @Test
     public void testFetchMissingTask() throws Exception {
-        store.fetchTask(TASK_NAME);
+        assertFalse(store.fetchTask(TASK_NAME).isPresent());
     }
 
     @Test
@@ -117,11 +118,11 @@ public class CuratorStateStoreTest {
     public void testRepeatedStoreTask() throws Exception {
         Collection<Protos.TaskInfo> tasks = createTasks(TASK_NAME);
         store.storeTasks(tasks);
-        assertEquals(tasks.iterator().next(), store.fetchTask(TASK_NAME));
+        assertEquals(tasks.iterator().next(), store.fetchTask(TASK_NAME).get());
 
         tasks = createTasks(TASK_NAME);
         store.storeTasks(tasks);
-        assertEquals(tasks.iterator().next(), store.fetchTask(TASK_NAME));
+        assertEquals(tasks.iterator().next(), store.fetchTask(TASK_NAME).get());
 
         Collection<String> taskNames = store.fetchTaskNames();
         assertEquals(1, taskNames.size());
@@ -134,11 +135,11 @@ public class CuratorStateStoreTest {
         store.clearTask(TASK_NAME);
     }
 
-    @Test(expected=StateStoreException.class)
+    @Test
     public void testStoreClearFetchTask() throws Exception {
         store.storeTasks(createTasks(TASK_NAME));
         store.clearTask(TASK_NAME);
-        store.fetchTask(TASK_NAME);
+        Assert.assertFalse(store.fetchTask(TASK_NAME).isPresent());
     }
 
     @Test
@@ -191,7 +192,7 @@ public class CuratorStateStoreTest {
         Protos.TaskInfo taskInfoA = createTask("a");
         store.storeTasks(Arrays.asList(taskInfoA));
 
-        assertEquals(taskInfoA, store.fetchTask("a"));
+        assertEquals(taskInfoA, store.fetchTask("a").get());
         assertEquals(1, store.fetchTaskNames().size());
         assertEquals("a", store.fetchTaskNames().iterator().next());
         assertEquals(1, store.fetchTasks().size());
@@ -201,14 +202,14 @@ public class CuratorStateStoreTest {
         Protos.TaskInfo taskInfoB = createTask("b");
         store.storeTasks(Arrays.asList(taskInfoB));
 
-        assertEquals(taskInfoB, store.fetchTask("b"));
+        assertEquals(taskInfoB, store.fetchTask("b").get());
         assertEquals(2, store.fetchTaskNames().size());
         assertEquals(2, store.fetchTasks().size());
         assertTrue(store.fetchStatuses().isEmpty());
 
         store.clearTask("a");
 
-        assertEquals(taskInfoB, store.fetchTask("b"));
+        assertEquals(taskInfoB, store.fetchTask("b").get());
         assertEquals(1, store.fetchTaskNames().size());
         assertEquals("b", store.fetchTaskNames().iterator().next());
         assertEquals(1, store.fetchTasks().size());
@@ -400,7 +401,7 @@ public class CuratorStateStoreTest {
         Protos.TaskInfo taskInfoA = createTask("a");
         store.storeTasks(Arrays.asList(taskInfoA));
 
-        assertEquals(taskInfoA, store.fetchTask("a"));
+        assertEquals(taskInfoA, store.fetchTask("a").get());
         assertEquals(1, store.fetchTaskNames().size());
         assertEquals("a", store.fetchTaskNames().iterator().next());
         assertTrue(store.fetchStatuses().isEmpty());
