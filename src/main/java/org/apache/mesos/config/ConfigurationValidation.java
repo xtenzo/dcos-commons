@@ -1,6 +1,7 @@
 package org.apache.mesos.config;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The {@code ConfigurationValidation} interface should be implemented by any class
@@ -20,5 +21,5 @@ public interface ConfigurationValidation {
      * @param newConfig Proposed new Configuration
      * @return List of errors, or an empty list if validation passed
      */
-    List<ConfigurationValidationError> validate(Configuration oldConfig, Configuration newConfig);
+    List<ConfigurationValidationError> validate(Optional<Configuration> oldConfig, Configuration newConfig);
 }

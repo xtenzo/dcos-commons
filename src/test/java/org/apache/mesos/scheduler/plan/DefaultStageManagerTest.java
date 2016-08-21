@@ -3,16 +3,16 @@ package org.apache.mesos.scheduler.plan;
 import org.apache.mesos.Protos;
 import org.apache.mesos.protobuf.TaskStatusBuilder;
 import org.apache.mesos.reconciliation.Reconciler;
-import org.apache.mesos.reconciliation.TaskStatusProvider;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.Assert;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import static org.mockito.Mockito.*;
 
 import java.util.Arrays;
 import java.util.UUID;
+
+import static org.mockito.Mockito.*;
 
 /**
  * This class tests the {@link DefaultStageManager}.
@@ -30,9 +30,6 @@ public class DefaultStageManagerTest {
 
     @Mock
     Reconciler reconciler;
-
-    @Mock
-    TaskStatusProvider taskProvider;
 
     @Before
     public void beforeEach() {
@@ -103,7 +100,7 @@ public class DefaultStageManagerTest {
     @Test
     public void testInProgressStatus() {
         when(reconciler.isReconciled()).thenReturn(false);
-        ReconciliationPhase reconciliationPhase = ReconciliationPhase.create(reconciler, taskProvider);
+        ReconciliationPhase reconciliationPhase = ReconciliationPhase.create(reconciler);
         Stage waitingStage = DefaultStage.fromArgs(
                 reconciliationPhase,
                 DefaultPhase.create(

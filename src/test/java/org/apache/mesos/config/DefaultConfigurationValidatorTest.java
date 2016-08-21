@@ -3,9 +3,7 @@ package org.apache.mesos.config;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.*;
 
 public class DefaultConfigurationValidatorTest {
     public static class TestConfig implements Configuration {
@@ -31,10 +29,10 @@ public class DefaultConfigurationValidatorTest {
     }
 
     ConfigurationValidation test = (oldConfig, newConfig) -> {
-        final TestConfig oConfig = (TestConfig) oldConfig;
+        final Optional<TestConfig> oConfig = oldConfig.map(c -> (TestConfig) c);
         final TestConfig nConfig = (TestConfig) newConfig;
 
-        if (oConfig.getA() != nConfig.getA()) {
+        if (oConfig.get().getA() != nConfig.getA()) {
             return Arrays.asList(new ConfigurationValidationError("a", "" + nConfig.getA(), "not equal"));
         }
 
@@ -47,7 +45,8 @@ public class DefaultConfigurationValidatorTest {
         final TestConfig newConfig = new TestConfig(2);
 
         final DefaultConfigurationValidator configurationValidator = new DefaultConfigurationValidator();
-        final Collection<ConfigurationValidationError> validate = configurationValidator.validate(oldConfig, newConfig);
+        final Collection<ConfigurationValidationError> validate =
+                configurationValidator.validate(Optional.of(oldConfig), newConfig);
 
         Assert.assertNotNull(validate);
         Assert.assertTrue(validate.size() == 0);
@@ -60,7 +59,8 @@ public class DefaultConfigurationValidatorTest {
 
         final DefaultConfigurationValidator configurationValidator
                 = new DefaultConfigurationValidator(Arrays.asList(test));
-        final Collection<ConfigurationValidationError> validate = configurationValidator.validate(oldConfig, newConfig);
+        final Collection<ConfigurationValidationError> validate =
+                configurationValidator.validate(Optional.of(oldConfig), newConfig);
 
         Assert.assertNotNull(validate);
         Assert.assertTrue(validate.size() == 0);
@@ -73,7 +73,8 @@ public class DefaultConfigurationValidatorTest {
 
         final DefaultConfigurationValidator configurationValidator
                 = new DefaultConfigurationValidator(Arrays.asList(test));
-        final Collection<ConfigurationValidationError> validate = configurationValidator.validate(oldConfig, newConfig);
+        final Collection<ConfigurationValidationError> validate =
+                configurationValidator.validate(Optional.of(oldConfig), newConfig);
 
         Assert.assertNotNull(validate);
         Assert.assertTrue(validate.size() == 1);

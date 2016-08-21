@@ -5,7 +5,6 @@ package org.apache.mesos.scheduler.plan;
  */
 public class DefaultStrategyFactory implements PhaseStrategyFactory {
 
-
   @Override
   public PhaseStrategy getStrategy(Phase phase) {
     if (phase == null) {
