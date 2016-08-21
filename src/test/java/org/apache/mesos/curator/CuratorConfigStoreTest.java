@@ -4,6 +4,7 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.curator.test.TestingServer;
 import org.apache.mesos.config.ConfigStore;
 import org.apache.mesos.config.ConfigStoreException;
+import org.apache.mesos.config.ConfigurationFactory;
 import org.apache.mesos.config.StringConfiguration;
 import org.apache.mesos.storage.CuratorPersister;
 import org.apache.mesos.testing.CuratorTestUtils;
@@ -22,6 +23,7 @@ import static org.junit.Assert.*;
  */
 public class CuratorConfigStoreTest {
     private static final String ROOT_ZK_PATH = "/test-root-path";
+    private static final ConfigurationFactory<StringConfiguration> FACTORY = new StringConfiguration.Factory();
 
     private static TestingServer testZk;
     private ConfigStore<StringConfiguration> store;
@@ -109,7 +111,7 @@ public class CuratorConfigStoreTest {
     public void testStoreSetTargetConfigGetTargetConfig() throws Exception {
         UUID testId = store.store(testConfig);
         store.setTargetConfig(testId);
-        assertEquals(testId, store.getTargetConfig());
+        assertEquals(testConfig, store.getTargetConfig(FACTORY).get());
     }
 
     @Test
@@ -119,8 +121,8 @@ public class CuratorConfigStoreTest {
         store.setTargetConfig(testId);
     }
 
-    @Test(expected=ConfigStoreException.class)
+    @Test
     public void testGetEmptyTargetConfig() throws Exception {
-        store.getTargetConfig();
+        assertFalse(store.getTargetConfig(FACTORY).isPresent());
     }
 }

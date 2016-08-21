@@ -1,6 +1,7 @@
 package org.apache.mesos.config;
 
 import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -54,17 +55,17 @@ public interface ConfigStore<T extends Configuration> {
     /**
      * Stores the ID of the active target configuration, replacing any current value.
      *
-     * @see #getTargetConfig()
+     * @see #getTargetConfig(ConfigurationFactory<T>)
      * @throws ConfigStoreException if writing the ID fails
      */
     void setTargetConfig(UUID id) throws ConfigStoreException;
 
     /**
-     * Returns the current ID of the active target configuration, or throws an exception if none is
+     * Returns the current target configuration, or the Optional is not present if no target configuration has ever been
      * set.
      *
      * @see #setTargetConfig(UUID)
-     * @throws ConfigStoreException if reading or deserializing the ID fails, or no value is set
+     * @throws ConfigStoreException if reading or deserializing the ID fails
      */
-    UUID getTargetConfig() throws ConfigStoreException;
+    Optional<T> getTargetConfig(ConfigurationFactory<T> factory) throws ConfigStoreException;
 }

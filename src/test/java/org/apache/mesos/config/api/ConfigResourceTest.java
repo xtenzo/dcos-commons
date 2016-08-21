@@ -1,8 +1,5 @@
 package org.apache.mesos.config.api;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 import org.apache.mesos.config.ConfigStore;
 import org.apache.mesos.config.ConfigStoreException;
 import org.apache.mesos.config.ConfigurationFactory;
@@ -13,14 +10,17 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.Arrays;
-import java.util.UUID;
 import javax.ws.rs.core.Response;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.when;
 
 public class ConfigResourceTest {
 
-    private static final ConfigurationFactory<StringConfiguration> FACTORY =
-            new StringConfiguration.Factory();
+    private static final ConfigurationFactory<StringConfiguration> FACTORY = new StringConfiguration.Factory();
 
     private static final UUID ID1 = UUID.randomUUID();
     private static final UUID ID2 = UUID.randomUUID();
@@ -76,42 +76,30 @@ public class ConfigResourceTest {
     }
 
     @Test
-    public void testGetTargetId() throws ConfigStoreException {
-        when(mockConfigStore.getTargetConfig()).thenReturn(ID2);
-        Response response = resource.getTargetId();
-        assertEquals(200, response.getStatus());
-        JSONArray json = new JSONArray((String) response.getEntity());
-        assertEquals(1, json.length());
-        assertEquals(ID2.toString(), json.get(0));
-    }
-
-    @Test
-    public void testGetTargetIdFails() throws ConfigStoreException {
-        when(mockConfigStore.getTargetConfig()).thenThrow(new ConfigStoreException("hi"));
-        Response response = resource.getTargetId();
+    public void testGetTargetFails() throws ConfigStoreException {
+        when(mockConfigStore.getTargetConfig(FACTORY)).thenThrow(new ConfigStoreException("hi"));
+        Response response = resource.getTarget();
         assertEquals(500, response.getStatus());
     }
 
     @Test
     public void testGetTarget() throws ConfigStoreException {
-        when(mockConfigStore.getTargetConfig()).thenReturn(ID2);
-        when(mockConfigStore.fetch(ID2, FACTORY)).thenReturn(CONFIG1);
+        when(mockConfigStore.getTargetConfig(FACTORY)).thenReturn(Optional.of(CONFIG1));
         Response response = resource.getTarget();
         assertEquals(200, response.getStatus());
         assertEquals(CONFIG1.toJsonString(), (String) response.getEntity());
     }
 
     @Test
-    public void testGetTargetFailsTargetId() throws ConfigStoreException {
-        when(mockConfigStore.getTargetConfig()).thenThrow(new ConfigStoreException("hi"));
+    public void testGetTargetFailsTarget() throws ConfigStoreException {
+        when(mockConfigStore.getTargetConfig(FACTORY)).thenThrow(new ConfigStoreException("hi"));
         Response response = resource.getTarget();
         assertEquals(500, response.getStatus());
     }
 
     @Test
     public void testGetTargetFailsConfig() throws ConfigStoreException {
-        when(mockConfigStore.getTargetConfig()).thenReturn(ID2);
-        when(mockConfigStore.fetch(ID2, FACTORY)).thenThrow(new ConfigStoreException("hi"));
+        when(mockConfigStore.getTargetConfig(FACTORY)).thenThrow(new ConfigStoreException("hi"));
         Response response = resource.getTarget();
         assertEquals(500, response.getStatus());
     }

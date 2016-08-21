@@ -32,7 +32,7 @@ public class EnvironmentConfiguration implements Configuration {
     @Override
     public byte[] getBytes() throws ConfigStoreException {
         try {
-            return toJsonString().getBytes();
+            return toJsonString().getBytes("UTF-8");
         } catch (Exception e) {
             logger.error("Failed to get bytes with exception: ", e);
             throw new ConfigStoreException(e);

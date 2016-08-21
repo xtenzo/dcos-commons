@@ -40,14 +40,14 @@ public class DefaultScheduler implements Scheduler {
         this(frameworkName, Collections.emptyList());
     }
 
-    private void initialize() {
+    private void initialize() throws ConfigStoreException {
         this.stateStore = new CuratorStateStore(frameworkName);
         this.configStore = new CuratorConfigStore<EnvironmentConfiguration>(frameworkName);
         this.reconciler = new DefaultReconciler(stateStore);
         this.stageManager = new DefaultStageManager(getStage(), new DefaultStrategyFactory());
     }
 
-    private Stage getStage() {
+    private Stage getStage() throws ConfigStoreException {
         Collection<ConfigurationValidationError> configurationValidationErrors =
                 configurationValidator.validate(
                         getOldConfiguration(),
@@ -63,18 +63,8 @@ public class DefaultScheduler implements Scheduler {
         return stage;
     }
 
-    private Optional<Configuration> getOldConfiguration() {
-        Optional<Configuration> oldConfiguration = Optional.empty();
-        try {
-            oldConfiguration = Optional.of(
-                    configStore.fetch(
-                            configStore.getTargetConfig(),
-                            new EnvironmentConfiguration.Factory()));
-        } catch (ConfigStoreException e) {
-            logger.warn("No target configuration set.");
-        }
-
-        return oldConfiguration;
+    private Optional<Configuration> getOldConfiguration() throws ConfigStoreException {
+        return configStore.getTargetConfig(new EnvironmentConfiguration.Factory());
     }
 
     private Configuration getNewConfiguration() {
@@ -138,7 +128,11 @@ public class DefaultScheduler implements Scheduler {
     }
 
     @Override
-    public void frameworkMessage(SchedulerDriver driver, Protos.ExecutorID executorId, Protos.SlaveID slaveId, byte[] data) {
+    public void frameworkMessage(
+            SchedulerDriver driver,
+            Protos.ExecutorID executorId,
+            Protos.SlaveID slaveId,
+            byte[] data) {
 
     }
 

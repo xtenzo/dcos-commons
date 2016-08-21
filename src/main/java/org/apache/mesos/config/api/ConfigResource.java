@@ -1,20 +1,19 @@
 package org.apache.mesos.config.api;
 
-import java.util.Arrays;
-import java.util.UUID;
-
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
 import org.apache.mesos.config.ConfigStore;
 import org.apache.mesos.config.Configuration;
 import org.apache.mesos.config.ConfigurationFactory;
 import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * A read-only API for accessing active and inactive configurations from persistent storage.
@@ -67,40 +66,24 @@ public class ConfigResource<T extends Configuration> {
     }
 
     /**
-     * Produces the ID of the current target configuration, or returns an error if reading that
-     * data failed.
-     */
-    @Path("/targetId")
-    @GET
-    public Response getTargetId() {
-        try {
-            // return a JSONArray to line up with getConfigurationIds()
-            JSONArray configArray = new JSONArray(Arrays.asList(configStore.getTargetConfig()));
-            return Response.ok(configArray.toString(), MediaType.APPLICATION_JSON).build();
-        } catch (Exception ex) {
-            logger.error("Failed to fetch target configuration", ex);
-            return Response.serverError().build();
-        }
-    }
-
-    /**
      * Produces the content of the current target configuration, or returns an error if reading that
      * data failed.
      */
     @Path("/target")
     @GET
     public Response getTarget() {
-        UUID targetId;
+        Optional<T> config = Optional.empty();
         try {
-            targetId = configStore.getTargetConfig();
+            config = configStore.getTargetConfig(configFactory);
         } catch (Exception ex) {
             logger.error("Failed to fetch ID of target configuration", ex);
             return Response.serverError().build();
         }
+
         try {
-            return fetchConfig(targetId);
+            return Response.ok(config.get().toJsonString(), MediaType.APPLICATION_JSON).build();
         } catch (Exception ex) {
-            logger.error(String.format("Failed to fetch target configuration '%s'", targetId), ex);
+            logger.error("Failed to deserialize target configuration.", ex);
             return Response.serverError().build();
         }
     }

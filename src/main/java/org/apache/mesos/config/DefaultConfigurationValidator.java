@@ -20,7 +20,10 @@ public class DefaultConfigurationValidator implements ConfigurationValidator {
     }
 
     @Override
-    public Collection<ConfigurationValidationError> validate(Optional<Configuration> oldConfig, Configuration newConfig) {
+    public Collection<ConfigurationValidationError> validate(
+            Optional<Configuration> oldConfig,
+            Configuration newConfig) {
+
         final List<ConfigurationValidationError> errors = new ArrayList<>();
         for (ConfigurationValidation validation : validations) {
             errors.addAll(validation.validate(oldConfig, newConfig));

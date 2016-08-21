@@ -1,9 +1,5 @@
 package org.apache.mesos.curator;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.UUID;
-
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.mesos.config.ConfigStore;
@@ -14,9 +10,13 @@ import org.apache.mesos.dcos.DcosConstants;
 import org.apache.mesos.state.SchemaVersionStore;
 import org.apache.mesos.storage.CuratorPersister;
 import org.apache.zookeeper.KeeperException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * A CuratorConfigStore stores String Configurations in Zookeeper.
@@ -173,14 +173,32 @@ public class CuratorConfigStore<T extends Configuration> implements ConfigStore<
     }
 
     @Override
-    public UUID getTargetConfig() throws ConfigStoreException {
+    public Optional<T> getTargetConfig(ConfigurationFactory<T> factory) throws ConfigStoreException {
+        // Fetch raw bytes for the target Id
+        byte[] targetIdBytes;
         try {
-            return UUID.fromString(CuratorUtils.deserialize(curator.fetch(targetPath)));
+            targetIdBytes = curator.fetch(targetPath);
+        } catch (KeeperException.NoNodeException e) {
+            logger.warn("Target configuration has not been set.");
+            return Optional.empty();
         } catch (Exception e) {
+            logger.error("Failed to fetch target configuration from Zookeeper with exception: ", e);
             throw new ConfigStoreException(String.format(
-                    "Failed to retrieve current target configuration from path '%s'",
+                    "Failed to fetch target configuration from path '%s' with exception: ",
                     targetPath), e);
         }
+
+        // Convert raw bytes to a UUID
+        UUID targetId;
+        try {
+            targetId = UUID.fromString(CuratorUtils.deserialize(targetIdBytes));
+        } catch (Exception e) {
+            throw new ConfigStoreException(String.format(
+                    "Failed to deserialize target configuration from path '%s'",
+                    targetPath), e);
+        }
+
+        return Optional.of(fetch(targetId, factory));
     }
 
     private String getConfigPath(UUID id) {
