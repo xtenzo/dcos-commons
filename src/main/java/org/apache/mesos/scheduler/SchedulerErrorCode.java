@@ -5,5 +5,6 @@ package org.apache.mesos.scheduler;
  */
 public enum SchedulerErrorCode {
     SUCCESS,
+    REGISTRATION_FAILED,
     REREGISTERED
 }

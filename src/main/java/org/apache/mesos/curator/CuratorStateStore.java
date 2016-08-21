@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Optional;
 
 /**
  * CuratorStateStore is an implementation of {@link StateStore} which persists data in Zookeeper.
@@ -139,16 +140,19 @@ public class CuratorStateStore implements StateStore {
     }
 
     @Override
-    public Protos.FrameworkID fetchFrameworkId() throws StateStoreException {
+    public Optional<Protos.FrameworkID> fetchFrameworkId() throws StateStoreException {
         try {
             logger.debug("Fetching FrameworkID from '{}'", fwkIdPath);
             byte[] bytes = curator.fetch(fwkIdPath);
             if (bytes.length > 0) {
-                return Protos.FrameworkID.parseFrom(bytes);
+                return Optional.of(Protos.FrameworkID.parseFrom(bytes));
             } else {
                 throw new StateStoreException(String.format(
                         "Failed to retrieve FrameworkID in '%s'", fwkIdPath));
             }
+        } catch (KeeperException.NoNodeException e) {
+            logger.warn("No FramweworkId found.");
+            return Optional.empty();
         } catch (Exception e) {
             // Also throws if the FrameworkID isn't found
             throw new StateStoreException(e);

@@ -46,10 +46,10 @@ public interface StateStore {
     /**
      * Fetches the previously stored FrameworkID.
      *
-     * @return The previously stored FrameworkID
-     * @throws StateStoreException if no data was found (not set yet), or when fetching the FrameworkID otherwise fails
+     * @return The previously stored FrameworkID, or an empty Optional indicating the FrameworkID has not been set.
+     * @throws StateStoreException when fetching the FrameworkID fails
      */
-    Protos.FrameworkID fetchFrameworkId() throws StateStoreException;
+    Optional<Protos.FrameworkID> fetchFrameworkId() throws StateStoreException;
 
 
     // Write Tasks

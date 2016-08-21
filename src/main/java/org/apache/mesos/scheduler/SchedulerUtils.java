@@ -26,4 +26,12 @@ public class SchedulerUtils {
             }
         }
     }
+
+    public static String nameToRole(String frameworkName) {
+        return frameworkName + "-role";
+    }
+
+    public static String nameToPrincipal(String frameworkName) {
+        return frameworkName + "-principal";
+    }
 }

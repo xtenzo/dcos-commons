@@ -57,7 +57,7 @@ public class CuratorStateStoreTest {
     @Test
     public void testStoreFetchFrameworkId() throws Exception {
         store.storeFrameworkId(FRAMEWORK_ID);
-        assertEquals(FRAMEWORK_ID, store.fetchFrameworkId());
+        assertEquals(FRAMEWORK_ID, store.fetchFrameworkId().get());
     }
 
     @Test
@@ -68,9 +68,9 @@ public class CuratorStateStoreTest {
         assertNotEquals(0, curator.fetch("/dcos-service-test-root-path/FrameworkID").length);
     }
 
-    @Test(expected=StateStoreException.class)
+    @Test
     public void testFetchEmptyFrameworkId() throws Exception {
-        store.fetchFrameworkId();
+        assertFalse(store.fetchFrameworkId().isPresent());
     }
 
     @Test
@@ -79,11 +79,11 @@ public class CuratorStateStoreTest {
         store.clearFrameworkId();
     }
 
-    @Test(expected=StateStoreException.class)
+    @Test
     public void testStoreClearFetchFrameworkId() throws Exception {
         store.storeFrameworkId(FRAMEWORK_ID);
         store.clearFrameworkId();
-        store.fetchFrameworkId(); // throws
+        assertFalse(store.fetchFrameworkId().isPresent());
     }
 
     @Test

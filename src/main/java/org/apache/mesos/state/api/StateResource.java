@@ -1,19 +1,17 @@
 package org.apache.mesos.state.api;
 
-import java.util.Arrays;
+import com.googlecode.protobuf.format.JsonFormat;
+import org.apache.mesos.state.StateStore;
+import org.json.JSONArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
-import org.apache.mesos.state.StateStore;
-import org.json.JSONArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.googlecode.protobuf.format.JsonFormat;
+import java.util.Arrays;
 
 /**
  * A read-only API for accessing task and frameworkId state from persistent storage.
@@ -57,7 +55,7 @@ public class StateResource {
     public Response getFrameworkId() {
         try {
             JSONArray idArray = new JSONArray(
-                    Arrays.asList(stateStore.fetchFrameworkId().getValue()));
+                    Arrays.asList(stateStore.fetchFrameworkId().get().getValue()));
             return Response.ok(idArray.toString(), MediaType.APPLICATION_JSON).build();
         } catch (Exception ex) {
             logger.error("Failed to fetch target configuration", ex);

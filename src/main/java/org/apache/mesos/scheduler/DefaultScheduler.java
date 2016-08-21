@@ -7,9 +7,12 @@ import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.config.*;
 import org.apache.mesos.curator.CuratorConfigStore;
 import org.apache.mesos.curator.CuratorStateStore;
+import org.apache.mesos.offer.DefaultOperationRecorder;
+import org.apache.mesos.offer.OfferAccepter;
 import org.apache.mesos.reconciliation.DefaultReconciler;
 import org.apache.mesos.reconciliation.Reconciler;
 import org.apache.mesos.scheduler.plan.*;
+import org.apache.mesos.scheduler.recovery.DefaultFailureListener;
 import org.apache.mesos.state.StateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,21 +26,26 @@ public class DefaultScheduler implements Scheduler {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final String frameworkName;
     private final ConfigurationValidator configurationValidator;
+    private final DefaultServiceSpecification serviceSpecification;
 
     private StateStore stateStore;
     private ConfigStore configStore;
     private Reconciler reconciler;
     private StageManager stageManager;
+    private OfferAccepter offerAccepter;
+    private DefaultStageScheduler stageScheduler;
+    private TaskKiller taskKiller;
 
-    private boolean isRegistered = false;
-
-    public DefaultScheduler(String frameworkName, Collection<ConfigurationValidation> validations) {
+    public DefaultScheduler(String frameworkName,
+                            DefaultServiceSpecification serviceSpecification,
+                            Collection<ConfigurationValidation> validations) {
         this.frameworkName = frameworkName;
+        this.serviceSpecification = serviceSpecification;
         this.configurationValidator = new DefaultConfigurationValidator(validations);
     }
 
-    public DefaultScheduler(String frameworkName) {
-        this(frameworkName, Collections.emptyList());
+    public DefaultScheduler(String frameworkName, DefaultServiceSpecification serviceSpecification) {
+        this(frameworkName, serviceSpecification, Collections.emptyList());
     }
 
     private void initialize() throws ConfigStoreException {
@@ -45,6 +53,9 @@ public class DefaultScheduler implements Scheduler {
         this.configStore = new CuratorConfigStore<EnvironmentConfiguration>(frameworkName);
         this.reconciler = new DefaultReconciler(stateStore);
         this.stageManager = new DefaultStageManager(getStage(), new DefaultStrategyFactory());
+        this.offerAccepter = new OfferAccepter(Arrays.asList(new DefaultOperationRecorder(stateStore)));
+        this.stageScheduler = new DefaultStageScheduler(offerAccepter);
+        this.taskKiller = new DefaultTaskKiller(new DefaultFailureListener(stateStore));
     }
 
     private Stage getStage() throws ConfigStoreException {
@@ -54,6 +65,7 @@ public class DefaultScheduler implements Scheduler {
                         getNewConfiguration());
 
         List<Phase> phases = Arrays.asList(ReconciliationPhase.create(reconciler));
+        phases.addAll(getDeploymentPhases());
 
         // If config validation had errors, expose them via the Stage.
         Stage stage = configurationValidationErrors.isEmpty()
@@ -61,6 +73,37 @@ public class DefaultScheduler implements Scheduler {
                 : DefaultStage.withErrors(phases, validationErrorsToStrings(configurationValidationErrors));
 
         return stage;
+    }
+
+    private List<Phase> getDeploymentPhases() {
+        List<Phase> phases = new ArrayList<>();
+
+        for (Map.Entry<TaskSpecification, Integer> entry : serviceSpecification.getTaskSpecificationMap().entrySet()) {
+            TaskSpecification taskSpecification = entry.getKey();
+            Integer count = entry.getValue();
+            phases.add(
+                    DefaultDeploymentPhase.create(
+                            "deployment",
+                            taskKiller,
+                            getTaskSpecifications(taskSpecification, count),
+                            stateStore));
+        }
+
+        return phases;
+    }
+
+    private List<TaskSpecification> getTaskSpecifications(TaskSpecification taskSpecification, Integer count) {
+        List<TaskSpecification> taskSpecifications = new ArrayList<>();
+
+        for (int i=0; i<count; i++) {
+            taskSpecifications.add(
+                    new DefaultTaskSpecification(
+                            taskSpecification.getName() + "-" + i,
+                            taskSpecification.getResources(),
+                            taskSpecification.getCommand()));
+        }
+
+        return taskSpecifications;
     }
 
     private Optional<Configuration> getOldConfiguration() throws ConfigStoreException {
@@ -87,17 +130,15 @@ public class DefaultScheduler implements Scheduler {
         try {
             initialize();
             stateStore.storeFrameworkId(frameworkId);
-            isRegistered = true;
         } catch (Exception e) {
-            isRegistered = false;
-            logger.error(String.format(
-                    "Unable to store registered framework ID '%s'", frameworkId.getValue()), e);
+            logger.error("Unable to startup at registration time with exception: ", e);
+            hardExit(SchedulerErrorCode.REGISTRATION_FAILED);
         }
     }
 
     @Override
     public void reregistered(SchedulerDriver driver, Protos.MasterInfo masterInfo) {
-        logger.error("Registered framework with master: " + masterInfo);
+        logger.error("Re-registered framework with master: " + masterInfo);
         hardExit(SchedulerErrorCode.REREGISTERED);
     }
 
@@ -112,6 +153,9 @@ public class DefaultScheduler implements Scheduler {
             logger.info("Accepting no offers: Reconciler is still in progress");
         } else {
             Block block = stageManager.getCurrentBlock();
+            if (block != null) {
+                acceptedOffers = stageScheduler.resourceOffers(driver, offers, block);
+            }
         }
 
         SchedulerUtils.declineOffers(driver, acceptedOffers, offers);
@@ -154,10 +198,6 @@ public class DefaultScheduler implements Scheduler {
     @Override
     public void error(SchedulerDriver driver, String message) {
 
-    }
-
-    public boolean isRegistered() {
-        return isRegistered;
     }
 
     private void logOffers(List<Protos.Offer> offers) {
