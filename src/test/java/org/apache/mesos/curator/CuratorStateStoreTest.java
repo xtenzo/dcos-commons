@@ -9,7 +9,6 @@ import org.apache.mesos.state.StateStore;
 import org.apache.mesos.state.StateStoreException;
 import org.apache.mesos.storage.CuratorPersister;
 import org.apache.mesos.testing.CuratorTestUtils;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -139,7 +138,7 @@ public class CuratorStateStoreTest {
     public void testStoreClearFetchTask() throws Exception {
         store.storeTasks(createTasks(TASK_NAME));
         store.clearTask(TASK_NAME);
-        Assert.assertFalse(store.fetchTask(TASK_NAME).isPresent());
+        assertFalse(store.fetchTask(TASK_NAME).isPresent());
     }
 
     @Test

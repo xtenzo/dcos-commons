@@ -1,18 +1,18 @@
 package org.apache.mesos.scheduler.plan;
 
-import java.util.Map;
+import java.util.List;
 
 /**
  * Created by gabriel on 8/20/16.
  */
 public class DefaultServiceSpecification {
-    private final Map<TaskSpecification, Integer> taskMap;
+    private final List<TaskSpecificationTemplate> taskSpecificationTemplates;
 
-    public DefaultServiceSpecification(Map<TaskSpecification, Integer> taskMap) {
-        this.taskMap = taskMap;
+    public DefaultServiceSpecification(List<TaskSpecificationTemplate> taskSpecificationTemplates) {
+        this.taskSpecificationTemplates = taskSpecificationTemplates;
     }
 
-    public Map<TaskSpecification, Integer> getTaskSpecificationMap() {
-        return taskMap;
+    public List<TaskSpecificationTemplate> getTaskSpecificationTempaltes() {
+        return taskSpecificationTemplates;
     }
 }

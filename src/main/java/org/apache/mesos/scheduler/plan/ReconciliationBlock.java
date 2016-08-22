@@ -6,6 +6,8 @@ import org.apache.mesos.reconciliation.Reconciler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -69,8 +71,8 @@ public class ReconciliationBlock implements Block {
     }
 
     @Override
-    public void updateOfferStatus(boolean accepted) {
-        if (accepted) {
+    public void updateOfferStatus(Optional<Set<Protos.TaskID>> taskIds) {
+        if (taskIds.isPresent()) {
             throw new UnsupportedOperationException(
                     "updateOfferStatus() not expected: start() always returns null");
         }

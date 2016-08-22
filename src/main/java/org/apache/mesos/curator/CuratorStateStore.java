@@ -4,6 +4,7 @@ import org.apache.curator.RetryPolicy;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.mesos.Protos;
 import org.apache.mesos.dcos.DcosConstants;
+import org.apache.mesos.offer.ResourceUtils;
 import org.apache.mesos.offer.TaskException;
 import org.apache.mesos.offer.TaskUtils;
 import org.apache.mesos.state.SchemaVersionStore;
@@ -15,10 +16,7 @@ import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * CuratorStateStore is an implementation of {@link StateStore} which persists data in Zookeeper.
@@ -379,6 +377,32 @@ public class CuratorStateStore implements StateStore {
         } catch (Exception e) {
             throw new StateStoreException(e);
         }
+    }
+
+    @Override
+    public List<Protos.Resource> getExpectedResources() {
+        List<Protos.Resource> resources = new ArrayList<>();
+        try {
+            for (Protos.TaskInfo taskInfo : fetchTasks()) {
+                for (Protos.Resource resource : taskInfo.getResourcesList()) {
+                    if (ResourceUtils.getResourceId(resource) != null) {
+                        resources.add(resource);
+                    }
+                }
+
+                if (taskInfo.hasExecutor()) {
+                    for (Protos.Resource resource : taskInfo.getExecutor().getResourcesList()) {
+                        if (ResourceUtils.getResourceId(resource) != null) {
+                            resources.add(resource);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            logger.error("Failed to retrieve all Task information", ex);
+            return resources;
+        }
+        return resources;
     }
 
     // Internals

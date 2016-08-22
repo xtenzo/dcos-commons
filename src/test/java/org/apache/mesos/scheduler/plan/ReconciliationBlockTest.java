@@ -1,6 +1,7 @@
 package org.apache.mesos.scheduler.plan;
 
 import com.google.common.collect.Sets;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.reconciliation.Reconciler;
@@ -9,6 +10,8 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.Assert.*;
@@ -107,12 +110,14 @@ public class ReconciliationBlockTest {
     @Test
     public void testUpdateOfferStatusFalseSucceeds() {
         // Expect no exception to be thrown
-        block.updateOfferStatus(false);
+        block.updateOfferStatus(Optional.empty());
     }
 
     @Test(expected=UnsupportedOperationException.class)
     public void testUpdateOfferStatusTrueFails() {
-        block.updateOfferStatus(true);
+        Set<Protos.TaskID> taskIDs = new HashSet<>();
+        taskIDs.add(Protos.TaskID.newBuilder().setValue("test-task-id").build());
+        block.updateOfferStatus(Optional.of(taskIDs));
     }
 
     @Test

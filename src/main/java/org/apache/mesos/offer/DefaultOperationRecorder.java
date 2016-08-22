@@ -1,6 +1,5 @@
 package org.apache.mesos.offer;
 
-import com.google.protobuf.TextFormat;
 import org.apache.mesos.Protos;
 import org.apache.mesos.state.StateStore;
 import org.apache.mesos.state.StateStoreException;
@@ -33,14 +32,19 @@ public class DefaultOperationRecorder implements OperationRecorder {
         logger.info(String.format("Recording %d updated TaskInfos/TaskStatuses:", taskInfos.size()));
 
         for (Protos.TaskInfo taskInfo : taskInfos) {
-            Protos.TaskStatus taskStatus = Protos.TaskStatus.newBuilder()
+            Protos.TaskStatus.Builder taskStatus = Protos.TaskStatus.newBuilder()
                     .setTaskId(taskInfo.getTaskId())
                     .setExecutorId(taskInfo.getExecutor().getExecutorId())
-                    .setState(Protos.TaskState.TASK_STAGING)
-                    .build();
+                    .setState(Protos.TaskState.TASK_STAGING);
+
+            if (taskInfo.hasExecutor()) {
+                taskStatus.setExecutorId(taskInfo.getExecutor().getExecutorId());
+            } else {
+                taskStatus.setExecutorId(Protos.ExecutorID.newBuilder().setValue("STAGING"));
+            }
+
             logger.info(String.format("- %s => %s", taskInfo, taskStatus));
-            logger.info("Marking stopped task as failed: {}", TextFormat.shortDebugString(taskInfo));
-            taskStatuses.add(taskStatus);
+            taskStatuses.add(taskStatus.build());
         }
 
         stateStore.storeTasks(taskInfos);

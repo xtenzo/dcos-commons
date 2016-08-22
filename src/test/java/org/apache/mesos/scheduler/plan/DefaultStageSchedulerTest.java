@@ -1,32 +1,18 @@
 package org.apache.mesos.scheduler.plan;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
-import static org.mockito.Mockito.when;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
-import org.apache.mesos.SchedulerDriver;
-import org.apache.mesos.offer.InvalidRequirementException;
-import org.apache.mesos.offer.OfferAccepter;
-import org.apache.mesos.offer.OfferEvaluator;
-import org.apache.mesos.offer.OfferRecommendation;
-import org.apache.mesos.offer.OfferRequirement;
-import org.apache.mesos.offer.TaskUtils;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.*;
 import org.apache.mesos.Protos.Offer.Operation;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.offer.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import java.util.*;
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Tests for {@link DefaultStageScheduler}.
@@ -46,7 +32,13 @@ public class DefaultStageSchedulerTest {
             .build());
     private static final List<OfferRecommendation> RECOMMENDATIONS =
             Arrays.asList(new OfferRecommendation() {
-                @Override public Operation getOperation() { return null; }
+                @Override public Operation getOperation() {
+                    return Operation.newBuilder()
+                            .setType(Operation.Type.LAUNCH)
+                            .setLaunch(Operation.Launch.newBuilder()
+                                    .addAllTaskInfos(TASKINFOS))
+                            .build();
+                }
                 @Override public Offer getOffer() { return null; }
             });
     private static final List<OfferID> ACCEPTED_IDS =
@@ -95,7 +87,6 @@ public class DefaultStageSchedulerTest {
 
         assertTrue(scheduler.resourceOffers(mockSchedulerDriver, OFFERS, block).isEmpty());
 
-        assertTrue(block.offerStatus.isPresent());
         verify(mockOfferEvaluator).evaluate(requirement, OFFERS);
         assertTrue(block.isPending());
     }
@@ -105,15 +96,8 @@ public class DefaultStageSchedulerTest {
         OfferRequirement requirement = new OfferRequirement(TASKINFOS);
         TestOfferBlock block =(TestOfferBlock)new TestOfferBlock(requirement)
                 .setStatus(Status.PENDING);
-        when(mockOfferEvaluator.evaluate(requirement, OFFERS)).thenReturn(RECOMMENDATIONS);
-        when(mockOfferAccepter.accept(mockSchedulerDriver, RECOMMENDATIONS))
-                .thenReturn(new ArrayList<>());
-
+        when(mockOfferEvaluator.evaluate(requirement, OFFERS)).thenReturn(Collections.emptyList());
         assertTrue(scheduler.resourceOffers(mockSchedulerDriver, OFFERS, block).isEmpty());
-
-        assertTrue(block.offerStatus.isPresent());
-        assertFalse(block.offerStatus.get());
-        verify(mockOfferAccepter).accept(mockSchedulerDriver, RECOMMENDATIONS);
         assertTrue(block.isPending());
     }
 
@@ -128,14 +112,11 @@ public class DefaultStageSchedulerTest {
 
         assertEquals(ACCEPTED_IDS, scheduler.resourceOffers(mockSchedulerDriver, OFFERS, block));
 
-        assertTrue(block.offerStatus.isPresent());
-        assertTrue(block.offerStatus.get());
         assertTrue(block.isInProgress());
     }
 
     private static class TestOfferBlock extends TestBlock {
         private final OfferRequirement requirement;
-        private Optional<Boolean> offerStatus = Optional.empty();
 
         private TestOfferBlock(OfferRequirement requirementToReturn) {
             super();
@@ -146,12 +127,6 @@ public class DefaultStageSchedulerTest {
         public OfferRequirement start() {
             super.start();
             return requirement;
-        }
-
-        @Override
-        public void updateOfferStatus(boolean accepted) {
-            super.updateOfferStatus(accepted);
-            offerStatus = Optional.of(accepted);
         }
     }
 }

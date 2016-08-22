@@ -3,6 +3,8 @@ package org.apache.mesos.scheduler.plan;
 import org.apache.mesos.Protos;
 import org.apache.mesos.offer.OfferRequirement;
 
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -70,8 +72,8 @@ public class TestBlock implements Block {
     }
 
     @Override
-    public void updateOfferStatus(boolean accepted) {
-        if (!accepted) {
+    public void updateOfferStatus(Optional<Set<Protos.TaskID>> taskIds) {
+        if (!taskIds.isPresent()) {
             setStatus(Status.PENDING);
         } else {
             setStatus(Status.IN_PROGRESS);

@@ -131,7 +131,7 @@ public class DefaultStageManager implements StageManager {
       if (currentPhase != null) {
         final List<? extends Block> blocks = currentPhase.getBlocks();
         for (Block block : blocks) {
-          LOGGER.debug("Updating block '{}' with status", block.getName());
+          LOGGER.debug("Updating block '{}' with status: '{}'", block.getName(), status);
           block.update(status);
         }
       } else {

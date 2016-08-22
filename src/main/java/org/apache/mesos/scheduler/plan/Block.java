@@ -3,6 +3,8 @@ package org.apache.mesos.scheduler.plan;
 import org.apache.mesos.Protos;
 import org.apache.mesos.offer.OfferRequirement;
 
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -30,26 +32,26 @@ public interface Block extends Completable {
     }
 
     /**
-     * Returns whether the {@link Status} of the Block is {@link Status.Pending}, ie whether the
+     * Returns whether the {@link Status} of the Block is {@link Status.PENDING}, ie whether the
      * Scheduler should call {@link start()} for this Block. This must be {@code false} if either
      * {@link #isComplete()} or {@link #isInProgress()} is {@code true}.
      */
     boolean isPending();
 
     /**
-     * Returns whether the {@link Status} of the Block is {@link Status.InProgress}. This must be
+     * Returns whether the {@link Status} of the Block is {@link Status.IN_PROGRESS}. This must be
      * {@code false} if either {@link #isComplete()} or {@link #isPending()} is {@code true}.
      */
     boolean isInProgress();
 
     /**
-     * Starts the Block, whose {@link Status} should be {@link Status.Pending}. Returns an
+     * Starts the Block, whose {@link Status} should be {@link Status.PENDING}. Returns an
      * {@link OfferRequirement}, or {@code null} if obtaining/updating resource requirements are not
      * applicable to the Block. This will continue to be called for as long as {@link isPending()}
      * returns {@code true}.
      *
      * @see {@link #isPending()} which is the gate to whether {@code start()} is called
-     * @see {@link #updateOfferStatus(boolean)} which returns the outcome of the
+     * @see {@link #updateOfferStatus(Optional<Protos.TaskID>)} which returns the outcome of the
      *      {@link OfferRequirement}
      */
     OfferRequirement start();
@@ -61,7 +63,7 @@ public interface Block extends Completable {
      * could be found. This is only called if {@link #start()} returned a non-{@code null}
      * {@link OfferRequirement}.
      */
-    void updateOfferStatus(boolean accepted);
+    void updateOfferStatus(Optional<Set<Protos.TaskID>> optionalTaskId);
 
     /**
      * Forcefully restarts the block, putting it into a PENDING state, waiting to be resumed with

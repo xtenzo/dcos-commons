@@ -6,6 +6,9 @@ import org.apache.mesos.scheduler.TaskKiller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -16,13 +19,26 @@ public class DefaultBlock implements Block {
     private final UUID blockId = UUID.randomUUID();
     private final TaskSpecification taskSpecification;
     private final TaskKiller taskKiller;
-    private final OfferRequirement offerRequirement;
-    private Status status = Status.PENDING;
+    private final Optional<OfferRequirement> optionalOfferRequirement;
+    private Status status;
+    private Set<Protos.TaskID> taskIds = Collections.emptySet();
 
-    public DefaultBlock(TaskSpecification taskSpecification, TaskKiller taskKiller, OfferRequirement offerRequirement) {
+    public DefaultBlock(
+            TaskSpecification taskSpecification,
+            TaskKiller taskKiller,
+            Optional<OfferRequirement> optionalOfferRequirement,
+            Status initialStatus) {
         this.taskSpecification = taskSpecification;
         this.taskKiller = taskKiller;
-        this.offerRequirement = offerRequirement;
+        this.optionalOfferRequirement = optionalOfferRequirement;
+        this.status = initialStatus;
+    }
+
+    public DefaultBlock(
+            TaskSpecification taskSpecification,
+            TaskKiller taskKiller,
+            Optional<OfferRequirement> optionalOfferRequirement) {
+        this(taskSpecification, taskKiller, optionalOfferRequirement, Status.PENDING);
     }
 
     @Override
@@ -42,13 +58,18 @@ public class DefaultBlock implements Block {
 
     @Override
     public OfferRequirement start() {
-        return null;
+        if (optionalOfferRequirement.isPresent()) {
+            return optionalOfferRequirement.get();
+        } else {
+            return null;
+        }
     }
 
     @Override
-    public void updateOfferStatus(boolean accepted) {
-        if (accepted) {
+    public void updateOfferStatus(Optional<Set<Protos.TaskID>> optionalTaskIds) {
+        if (optionalTaskIds.isPresent()) {
             setStatus(Status.IN_PROGRESS);
+            setTaskIds(optionalTaskIds.get());
         } else {
             setStatus(Status.PENDING);
         }
@@ -65,7 +86,35 @@ public class DefaultBlock implements Block {
 
     @Override
     public void update(Protos.TaskStatus status) {
+        if (status.getReason().equals(Protos.TaskStatus.Reason.REASON_RECONCILIATION)) {
+            logger.warn("Ignoring TaskStatus update due to reconciliation.");
+            return;
+        }
 
+        logger.info("Updating '" + getName() + "' with TaskStatus: " + status);
+        logger.info("TaskIds: " + taskIds);
+
+        if (taskIds.contains(status.getTaskId())) {
+            switch (status.getState()) {
+                case TASK_RUNNING:
+                    setStatus(Status.COMPLETE);
+                    break;
+                case TASK_ERROR:
+                case TASK_FAILED:
+                case TASK_FINISHED:
+                case TASK_KILLED:
+                    setStatus(Status.PENDING);
+                    break;
+                case TASK_STAGING:
+                case TASK_STARTING:
+                    setStatus(Status.IN_PROGRESS);
+                    break;
+                default:
+                    logger.warn("Unhandled TaskState: " + status.getState());
+            }
+        } else {
+            logger.warn("Ignoring TaskStatus update from unexpected TaskID: ", status.getTaskId());
+        }
     }
 
     @Override
@@ -87,5 +136,15 @@ public class DefaultBlock implements Block {
         Status oldStatus = status;
         status = newStatus;
         logger.info(getName() + ": changed status from: " + oldStatus + " to: " + newStatus);
+    }
+
+    private void setTaskIds(Set<Protos.TaskID> taskIds) {
+        if (taskIds.isEmpty()) {
+            logger.warn("Expected TaskID set is empty.");
+        } else {
+            logger.info("Setting '" + taskIds.size() + "' expected TaskIDs to: " + taskIds);
+        }
+
+        this.taskIds = taskIds;
     }
 }

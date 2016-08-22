@@ -206,4 +206,9 @@ public interface StateStore {
      */
     void clearProperty(final String key) throws StateStoreException;
 
+    /**
+     * Provides the list of Resources which are expected to be reserved to a particular role.
+     * @return
+     */
+    List<Protos.Resource> getExpectedResources();
 }

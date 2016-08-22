@@ -11,14 +11,17 @@ public class DefaultTaskSpecification implements TaskSpecification {
     private final String name;
     private final Collection<Protos.Resource> resources;
     private final Protos.CommandInfo commandInfo;
+    private final TaskSpecificationMode mode;
 
     public DefaultTaskSpecification(
             String name,
             Collection<Protos.Resource> resources,
-            Protos.CommandInfo commandInfo) {
+            Protos.CommandInfo commandInfo,
+            TaskSpecificationMode mode) {
         this.name = name;
         this.resources = resources;
         this.commandInfo = commandInfo;
+        this.mode = mode;
     }
 
     @Override
@@ -34,5 +37,10 @@ public class DefaultTaskSpecification implements TaskSpecification {
     @Override
     public Protos.CommandInfo getCommand() {
         return commandInfo;
+    }
+
+    @Override
+    public TaskSpecificationMode getMode() {
+        return mode;
     }
 }

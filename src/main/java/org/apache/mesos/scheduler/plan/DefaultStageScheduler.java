@@ -10,8 +10,7 @@ import org.apache.mesos.offer.OfferRequirement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Default scheduler. See docs in {@link StageScheduler} interface.
@@ -59,7 +58,7 @@ public class DefaultStageScheduler implements StageScheduler {
         OfferRequirement offerReq = block.start();
         if (offerReq == null) {
             logger.info("No OfferRequirement for block: {}", block.getName());
-            block.updateOfferStatus(false);
+            block.updateOfferStatus(Optional.empty());
             return acceptedOffers;
         }
 
@@ -71,13 +70,39 @@ public class DefaultStageScheduler implements StageScheduler {
             logger.warn(
                     "Unable to find any offers which fulfill requirement provided by block {}: {}",
                     block.getName(), offerReq);
-            block.updateOfferStatus(false);
+            block.updateOfferStatus(Optional.empty());
             return acceptedOffers;
         }
 
         acceptedOffers = offerAccepter.accept(driver, recommendations);
+
         // notify block of offer outcome:
-        block.updateOfferStatus(!acceptedOffers.isEmpty());
+        if (acceptedOffers.size() > 0) {
+            Set<Protos.TaskID> taskIDs = getTaskIds(recommendations);
+            if (taskIDs.size() > 0) {
+                block.updateOfferStatus(Optional.of(taskIDs));
+            } else {
+                block.updateOfferStatus(Optional.empty());
+            }
+        } else {
+            block.updateOfferStatus(Optional.empty());
+        }
+
         return acceptedOffers;
+    }
+
+    private Set<Protos.TaskID> getTaskIds(List<OfferRecommendation> recommendations) {
+        Set<Protos.TaskID> taskIds = new HashSet<>();
+        for (OfferRecommendation recommendation : recommendations) {
+            Protos.Offer.Operation operation = recommendation.getOperation();
+            if (operation.hasType() &&
+                operation.getType().equals(Protos.Offer.Operation.Type.LAUNCH)) {
+                for (Protos.TaskInfo taskInfo : operation.getLaunch().getTaskInfosList()) {
+                    taskIds.add(taskInfo.getTaskId());
+                }
+            }
+        }
+
+        return taskIds;
     }
 }

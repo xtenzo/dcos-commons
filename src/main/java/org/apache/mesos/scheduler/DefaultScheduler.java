@@ -7,17 +7,21 @@ import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.config.*;
 import org.apache.mesos.curator.CuratorConfigStore;
 import org.apache.mesos.curator.CuratorStateStore;
-import org.apache.mesos.offer.DefaultOperationRecorder;
-import org.apache.mesos.offer.OfferAccepter;
+import org.apache.mesos.offer.*;
 import org.apache.mesos.reconciliation.DefaultReconciler;
 import org.apache.mesos.reconciliation.Reconciler;
 import org.apache.mesos.scheduler.plan.*;
-import org.apache.mesos.scheduler.recovery.DefaultFailureListener;
+import org.apache.mesos.scheduler.recovery.*;
+import org.apache.mesos.scheduler.recovery.constrain.TimedLaunchConstrainer;
+import org.apache.mesos.scheduler.recovery.monitor.TimedFailureMonitor;
 import org.apache.mesos.state.StateStore;
+import org.apache.mesos.state.StateStoreException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Created by gabriel on 8/20/16.
@@ -27,6 +31,7 @@ public class DefaultScheduler implements Scheduler {
     private final String frameworkName;
     private final ConfigurationValidator configurationValidator;
     private final DefaultServiceSpecification serviceSpecification;
+    private final AtomicReference<RecoveryStatus> recoveryStatusRef;
 
     private StateStore stateStore;
     private ConfigStore configStore;
@@ -34,6 +39,7 @@ public class DefaultScheduler implements Scheduler {
     private StageManager stageManager;
     private OfferAccepter offerAccepter;
     private DefaultStageScheduler stageScheduler;
+    private DefaultRecoveryScheduler recoveryScheduler;
     private TaskKiller taskKiller;
 
     public DefaultScheduler(String frameworkName,
@@ -42,69 +48,85 @@ public class DefaultScheduler implements Scheduler {
         this.frameworkName = frameworkName;
         this.serviceSpecification = serviceSpecification;
         this.configurationValidator = new DefaultConfigurationValidator(validations);
+        this.recoveryStatusRef = new AtomicReference<>(
+                new RecoveryStatus(Collections.emptyList(), Collections.emptyList()));
     }
 
     public DefaultScheduler(String frameworkName, DefaultServiceSpecification serviceSpecification) {
         this(frameworkName, serviceSpecification, Collections.emptyList());
     }
 
-    private void initialize() throws ConfigStoreException {
+    private void initialize() throws ConfigStoreException, TaskException {
         this.stateStore = new CuratorStateStore(frameworkName);
         this.configStore = new CuratorConfigStore<EnvironmentConfiguration>(frameworkName);
         this.reconciler = new DefaultReconciler(stateStore);
-        this.stageManager = new DefaultStageManager(getStage(), new DefaultStrategyFactory());
+
+        Collection<ConfigurationValidationError> validationErrors = processConfigurationUpdate();
+
+        this.stageManager = new DefaultStageManager(getStage(validationErrors), new DefaultStrategyFactory());
         this.offerAccepter = new OfferAccepter(Arrays.asList(new DefaultOperationRecorder(stateStore)));
         this.stageScheduler = new DefaultStageScheduler(offerAccepter);
-        this.taskKiller = new DefaultTaskKiller(new DefaultFailureListener(stateStore));
+        TaskFailureListener taskFailureListener = new DefaultFailureListener(stateStore);
+        this.recoveryScheduler = new DefaultRecoveryScheduler(
+                stateStore,
+                taskFailureListener,
+                new DefaultRecoveryRequirementProvider(),
+                offerAccepter,
+                new TimedLaunchConstrainer(Duration.ofSeconds(600)),
+                new TimedFailureMonitor(Duration.ofSeconds(600)),
+                recoveryStatusRef);
+        this.taskKiller = new DefaultTaskKiller(taskFailureListener);
     }
 
-    private Stage getStage() throws ConfigStoreException {
+    private Collection<ConfigurationValidationError> processConfigurationUpdate() throws ConfigStoreException {
+        Optional<Configuration> oldConfiguration = getOldConfiguration();
+        Configuration newConfiguration = getNewConfiguration();
         Collection<ConfigurationValidationError> configurationValidationErrors =
-                configurationValidator.validate(
-                        getOldConfiguration(),
-                        getNewConfiguration());
+                configurationValidator.validate(oldConfiguration, newConfiguration);
 
-        List<Phase> phases = Arrays.asList(ReconciliationPhase.create(reconciler));
+        Configuration currentConfiguration = configurationValidationErrors.isEmpty() ?
+                newConfiguration : oldConfiguration.get();
+
+        UUID currentConfigurationId = configStore.store(currentConfiguration);
+        configStore.setTargetConfig(currentConfigurationId);
+
+        return configurationValidationErrors;
+    }
+
+    private Stage getStage(Collection<ConfigurationValidationError> validationErrors)
+            throws ConfigStoreException, TaskException {
+
+        List<Phase> phases = new ArrayList(Arrays.asList(ReconciliationPhase.create(reconciler)));
         phases.addAll(getDeploymentPhases());
 
         // If config validation had errors, expose them via the Stage.
-        Stage stage = configurationValidationErrors.isEmpty()
+        Stage stage = validationErrors.isEmpty()
                 ? DefaultStage.fromList(phases)
-                : DefaultStage.withErrors(phases, validationErrorsToStrings(configurationValidationErrors));
+                : DefaultStage.withErrors(phases, validationErrorsToStrings(validationErrors));
 
         return stage;
     }
 
-    private List<Phase> getDeploymentPhases() {
+    private List<Phase> getDeploymentPhases() throws TaskException, ConfigStoreException {
         List<Phase> phases = new ArrayList<>();
 
-        for (Map.Entry<TaskSpecification, Integer> entry : serviceSpecification.getTaskSpecificationMap().entrySet()) {
-            TaskSpecification taskSpecification = entry.getKey();
-            Integer count = entry.getValue();
-            phases.add(
-                    DefaultDeploymentPhase.create(
-                            "deployment",
-                            taskKiller,
-                            getTaskSpecifications(taskSpecification, count),
-                            stateStore));
+        for (TaskSpecificationTemplate taskSpecificationTemplate :
+                serviceSpecification.getTaskSpecificationTempaltes()) {
+
+            TaskSpecificationFactory taskSpecificationFactory = new DefaultTaskSpecificationFactory();
+            List<TaskSpecification> taskSpecifications = taskSpecificationFactory.create(
+                    taskSpecificationTemplate,
+                    new DefaultConfigurationUpdateDetector(),
+                    new EnvironmentConfiguration.Factory(),
+                    configStore,
+                    stateStore);
+
+            phases.add(DefaultDeploymentPhase.create("deployment", taskKiller, taskSpecifications, stateStore));
         }
 
         return phases;
     }
 
-    private List<TaskSpecification> getTaskSpecifications(TaskSpecification taskSpecification, Integer count) {
-        List<TaskSpecification> taskSpecifications = new ArrayList<>();
-
-        for (int i = 0; i < count; i++) {
-            taskSpecifications.add(
-                    new DefaultTaskSpecification(
-                            taskSpecification.getName() + "-" + i,
-                            taskSpecification.getResources(),
-                            taskSpecification.getCommand()));
-        }
-
-        return taskSpecifications;
-    }
 
     private Optional<Configuration> getOldConfiguration() throws ConfigStoreException {
         return configStore.getTargetConfig(new EnvironmentConfiguration.Factory());
@@ -156,9 +178,31 @@ public class DefaultScheduler implements Scheduler {
             if (block != null) {
                 acceptedOffers = stageScheduler.resourceOffers(driver, offers, block);
             }
+
+            List<Protos.Offer> unacceptedOffers = SchedulerUtils.filterAcceptedOffers(offers, acceptedOffers);
+            try {
+                acceptedOffers.addAll(recoveryScheduler.resourceOffers(driver, unacceptedOffers, block));
+            } catch (Exception e) {
+                logger.error("Error repairing block: " + block + " Reason: ", e);
+            }
+
+            ResourceCleanerScheduler cleanerScheduler = getCleanerScheduler();
+            if (cleanerScheduler != null) {
+                acceptedOffers.addAll(getCleanerScheduler().resourceOffers(driver, offers));
+            }
         }
 
         SchedulerUtils.declineOffers(driver, acceptedOffers, offers);
+    }
+
+    private ResourceCleanerScheduler getCleanerScheduler() {
+        try {
+            ResourceCleaner cleaner = new ResourceCleaner(stateStore.getExpectedResources());
+            return new ResourceCleanerScheduler(cleaner, offerAccepter);
+        } catch (Exception ex) {
+            logger.error("Failed to construct ResourceCleaner", ex);
+            return null;
+        }
     }
 
     @Override
@@ -168,7 +212,33 @@ public class DefaultScheduler implements Scheduler {
 
     @Override
     public void statusUpdate(SchedulerDriver driver, Protos.TaskStatus status) {
+        stageManager.update(status);
+        updateStateStore(status);
+    }
 
+    private void updateStateStore(Protos.TaskStatus status) {
+        if (!status.getState().equals(Protos.TaskState.TASK_STAGING)
+                && !taskStatusExists(status)) {
+            logger.warn("Dropping non-STAGING status update because the ZK path doesn't exist: " + status);
+        } else {
+            stateStore.storeStatus(status);
+        }
+    }
+
+    private boolean taskStatusExists(Protos.TaskStatus taskStatus) throws StateStoreException {
+        String taskName;
+        try {
+            taskName = TaskUtils.toTaskName(taskStatus.getTaskId());
+        } catch (TaskException e) {
+            throw new StateStoreException(String.format(
+                    "Failed to get TaskName/ExecName from TaskStatus %s", taskStatus), e);
+        }
+        try {
+            stateStore.fetchStatus(taskName);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override

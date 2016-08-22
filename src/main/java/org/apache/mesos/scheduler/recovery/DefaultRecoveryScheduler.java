@@ -29,7 +29,7 @@ public class DefaultRecoveryScheduler {
     private final StateStore stateStore;
     private final OfferAccepter offerAccepter;
     private final TaskFailureListener failureListener;
-    private final RecoveryRequirementProvider offerReqProvider;
+    private final RecoveryRequirementProvider recoveryRequirementProvider;
     private final FailureMonitor failureMonitor;
     private final LaunchConstrainer launchConstrainer;
     private final AtomicReference<RecoveryStatus> repairStatusRef;
@@ -37,13 +37,13 @@ public class DefaultRecoveryScheduler {
     public DefaultRecoveryScheduler(
             StateStore stateStore,
             TaskFailureListener failureListener,
-            RecoveryRequirementProvider offerReqProvider,
+            RecoveryRequirementProvider recoveryRequirementProvider,
             OfferAccepter offerAccepter,
             LaunchConstrainer launchConstrainer,
             FailureMonitor failureMonitor,
             AtomicReference<RecoveryStatus> repairStatusRef) {
         this.stateStore = stateStore;
-        this.offerReqProvider = offerReqProvider;
+        this.recoveryRequirementProvider = recoveryRequirementProvider;
         this.offerAccepter = offerAccepter;
         this.failureMonitor = failureMonitor;
         this.launchConstrainer = launchConstrainer;
@@ -73,8 +73,9 @@ public class DefaultRecoveryScheduler {
         List<TaskInfo> stopped = repairStatusRef.get().getStopped();
         List<TaskInfo> failed = repairStatusRef.get().getFailed();
 
-        List<RecoveryRequirement> recoveryCandidates = offerReqProvider.getTransientRecoveryOfferRequirements(stopped);
-        recoveryCandidates.addAll(offerReqProvider.getPermanentRecoveryOfferRequirements(failed));
+        List<RecoveryRequirement> recoveryCandidates = recoveryRequirementProvider
+                .getTransientRecoveryOfferRequirements(stopped);
+        recoveryCandidates.addAll(recoveryRequirementProvider.getPermanentRecoveryOfferRequirements(failed));
 
         Optional<RecoveryRequirement> recoveryRequirement = Optional.empty();
         if (recoveryCandidates.size() > 0) {

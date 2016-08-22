@@ -5,6 +5,7 @@ import org.apache.mesos.SchedulerDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,5 +34,30 @@ public class SchedulerUtils {
 
     public static String nameToPrincipal(String frameworkName) {
         return frameworkName + "-principal";
+    }
+
+    public static List<Protos.Offer> filterAcceptedOffers(
+            List<Protos.Offer> offers,
+            List<Protos.OfferID> acceptedOfferIds) {
+
+        List<Protos.Offer> filteredOffers = new ArrayList<Protos.Offer>();
+
+        for (Protos.Offer offer : offers) {
+            if (!offerAccepted(offer, acceptedOfferIds)) {
+                filteredOffers.add(offer);
+            }
+        }
+
+        return filteredOffers;
+    }
+
+    private static boolean offerAccepted(Protos.Offer offer, List<Protos.OfferID> acceptedOfferIds) {
+        for (Protos.OfferID acceptedOfferId: acceptedOfferIds) {
+            if (acceptedOfferId.equals(offer.getId())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
