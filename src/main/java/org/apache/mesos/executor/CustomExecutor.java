@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.*;
@@ -46,34 +45,12 @@ public class CustomExecutor implements Executor {
         this.slaveInfo = slaveInfo;
         this.executorInfo = executorInfo;
         this.frameworkInfo = frameworkInfo;
-
-        try {
-            List<TimedExecutorTask> onRegisteredTasks = executorTaskFactory.createTimedTasks(
-                    DcosTaskConstants.ON_REGISTERED_TASK,
-                    executorInfo,
-                    driver);
-            processExecutorTasksSynchronously(onRegisteredTasks);
-        } catch (ExecutorTaskException | ExecutionException | InterruptedException | TimeoutException e) {
-            LOGGER.error("Tasks to be run upon registration failed. Exiting with exception: ", e);
-            hardExit(ExecutorErrorCode.ON_REGISTERED_TASK_FAILURE);
-        }
     }
 
     @Override
     public void reregistered(ExecutorDriver driver, Protos.SlaveInfo slaveInfo) {
         LOGGER.info("Re-registered executor: {}", executorInfo.getExecutorId());
         this.slaveInfo = slaveInfo;
-
-        try {
-            List<TimedExecutorTask> onReregisteredTasks = executorTaskFactory.createTimedTasks(
-                    DcosTaskConstants.ON_REREGISTERED_TASK,
-                    executorInfo,
-                    driver);
-            processExecutorTasksSynchronously(onReregisteredTasks);
-        } catch (ExecutorTaskException | ExecutionException | InterruptedException | TimeoutException e) {
-            LOGGER.error("Tasks to be run upon re-registration failed. Exiting with exception: ", e);
-            hardExit(ExecutorErrorCode.ON_REREGISTERED_TASK_FAILURE);
-        }
     }
 
     @Override
@@ -98,8 +75,7 @@ public class CustomExecutor implements Executor {
                 throw new ExecutorTaskException("Unable to determine task type: " + taskEnv);
             }
 
-            final String taskType = taskEnv.get(DcosTaskConstants.TASK_TYPE);
-            final ExecutorTask taskToExecute = executorTaskFactory.createTask(taskType, task, driver);
+            final ExecutorTask taskToExecute = executorTaskFactory.createTask(task, driver);
             executorService.submit(taskToExecute);
             scheduleHealthCheck(task, taskToExecute);
             launchedTasks.put(task.getTaskId(), taskToExecute);
@@ -115,6 +91,14 @@ public class CustomExecutor implements Executor {
                     String.format("Exception launching task %s",
                             t.getMessage()));
         }
+    }
+
+    public void submit(ExecutorTask task) {
+
+    }
+
+    public void submit(ScheduledExecutorTask scheduledExecutorTask) {
+
     }
 
     private void scheduleHealthCheck(Protos.TaskInfo taskInfo, ExecutorTask executorTask) {
@@ -233,13 +217,6 @@ public class CustomExecutor implements Executor {
 
     public void setExecutorService(ExecutorService executorService) {
         this.executorService = executorService;
-    }
-
-    private void processExecutorTasksSynchronously(List<TimedExecutorTask> tasks)
-            throws ExecutionException, InterruptedException, TimeoutException {
-        for (TimedExecutorTask task : tasks) {
-            executorService.submit(task).get(task.getTimeout().getSeconds(), TimeUnit.SECONDS);
-        }
     }
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings("DM_EXIT")
