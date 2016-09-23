@@ -4,6 +4,7 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.offer.*;
+import org.apache.mesos.offer.constrain.StuckDeploymentException;
 import org.apache.mesos.scheduler.TaskKiller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,10 +23,6 @@ public class DefaultPlanScheduler implements PlanScheduler {
     private final TaskKiller taskKiller;
 
     @Inject
-    public DefaultPlanScheduler(OfferAccepter offerAccepter, TaskKiller taskKiller) {
-        this(offerAccepter, new OfferEvaluator(), taskKiller);
-    }
-
     public DefaultPlanScheduler(OfferAccepter offerAccepter, OfferEvaluator offerEvaluator, TaskKiller taskKiller) {
         this.offerAccepter = offerAccepter;
         this.offerEvaluator = offerEvaluator;
@@ -67,7 +64,14 @@ public class DefaultPlanScheduler implements PlanScheduler {
 
         // Block has returned an OfferRequirement to process. Find offers which match the
         // requirement and accept them, if any are found:
-        List<OfferRecommendation> recommendations = offerEvaluator.evaluate(offerRequirement, offers);
+        List<OfferRecommendation> recommendations;
+        try {
+            recommendations = offerEvaluator.evaluate(offerRequirement, offers);
+        } catch (StuckDeploymentException e) {
+            throw new IllegalStateException(
+                    String.format("Unable to find valid deployment for block: %s", block.getName()),
+                    e);
+        }
         if (recommendations.isEmpty()) {
             // Log that we're not finding suitable offers, possibly due to insufficient resources.
             logger.warn(

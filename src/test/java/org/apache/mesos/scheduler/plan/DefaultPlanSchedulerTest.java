@@ -4,6 +4,7 @@ import org.apache.mesos.Protos.*;
 import org.apache.mesos.Protos.Offer.Operation;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.offer.*;
+import org.apache.mesos.offer.constrain.StuckDeploymentException;
 import org.apache.mesos.scheduler.TaskKiller;
 import org.junit.Before;
 import org.junit.Test;
@@ -75,7 +76,8 @@ public class DefaultPlanSchedulerTest {
     }
 
     @Test
-    public void testEvaluateNoRecommendations() throws InvalidRequirementException {
+    public void testEvaluateNoRecommendations()
+            throws InvalidRequirementException, StuckDeploymentException {
         OfferRequirement requirement = new OfferRequirement(TASKINFOS);
         TestOfferBlock block =(TestOfferBlock)new TestOfferBlock(requirement).setStatus(Status.PENDING);
         when(mockOfferEvaluator.evaluate(requirement, OFFERS)).thenReturn(new ArrayList<>());
@@ -87,7 +89,8 @@ public class DefaultPlanSchedulerTest {
     }
 
     @Test
-    public void testEvaluateNoAcceptedOffers() throws InvalidRequirementException {
+    public void testEvaluateNoAcceptedOffers()
+            throws InvalidRequirementException, StuckDeploymentException {
         OfferRequirement requirement = new OfferRequirement(TASKINFOS);
         TestOfferBlock block =(TestOfferBlock)new TestOfferBlock(requirement).setStatus(Status.PENDING);
         when(mockOfferEvaluator.evaluate(requirement, OFFERS)).thenReturn(RECOMMENDATIONS);
@@ -100,7 +103,8 @@ public class DefaultPlanSchedulerTest {
     }
 
     @Test
-    public void testEvaluateAcceptedOffers() throws InvalidRequirementException {
+    public void testEvaluateAcceptedOffers()
+            throws InvalidRequirementException, StuckDeploymentException {
         OfferRequirement requirement = new OfferRequirement(TASKINFOS);
         TestOfferBlock block =(TestOfferBlock)new TestOfferBlock(requirement).setStatus(Status.PENDING);
         when(mockOfferEvaluator.evaluate(requirement, OFFERS)).thenReturn(RECOMMENDATIONS);
