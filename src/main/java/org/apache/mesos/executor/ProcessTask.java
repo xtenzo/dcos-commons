@@ -16,7 +16,6 @@ import java.util.concurrent.*;
  */
 public class ProcessTask implements ExecutorTask {
     private static final Logger LOGGER = LoggerFactory.getLogger(ProcessTask.class);
-    private final String taskType;
     private final ProcessBuilder processBuilder;
     private final ExecutorDriver driver;
     private final Protos.TaskInfo taskInfo;
@@ -67,7 +66,6 @@ public class ProcessTask implements ExecutorTask {
             boolean exitOnTermination) throws InvalidProtocolBufferException {
         this.driver = executorDriver;
         this.taskInfo = taskInfo;
-        this.taskType = TaskUtils.getTaskType(taskInfo);
         this.processBuilder = processBuilder;
         this.exitOnTermination = exitOnTermination;
     }
@@ -86,7 +84,7 @@ public class ProcessTask implements ExecutorTask {
 
             this.process = processBuilder.start();
 
-            final String startMessage = "Launched Process of type: " + taskType;
+            final String startMessage = "Launched process: " + processBuilder.command();
             TaskUtils.sendStatus(
                     driver,
                     Protos.TaskState.TASK_RUNNING,
@@ -102,8 +100,7 @@ public class ProcessTask implements ExecutorTask {
 
             final int exitValue = process.exitValue();
 
-            String exitMessage = "Process of type: "
-                    + taskType + " exited with code: ";
+            String exitMessage = "Process : " + processBuilder.command() + " exited with code: ";
 
             exit.complete(exitValue);
 

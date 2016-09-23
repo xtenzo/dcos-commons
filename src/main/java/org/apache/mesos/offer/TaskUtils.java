@@ -6,7 +6,6 @@ import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.*;
 import org.apache.mesos.config.ConfigStore;
-import org.apache.mesos.executor.DcosTaskConstants;
 import org.apache.mesos.specification.ResourceSpecification;
 import org.apache.mesos.specification.TaskSpecification;
 import org.slf4j.Logger;
@@ -275,12 +274,6 @@ public class TaskUtils {
         }
 
         return false;
-    }
-
-    public static String getTaskType(TaskInfo taskInfo) throws InvalidProtocolBufferException {
-        final Protos.CommandInfo commandInfo = getCommand(taskInfo);
-        final Map<String, String> envMap = TaskUtils.fromEnvironmentToMap(commandInfo.getEnvironment());
-        return envMap.get(DcosTaskConstants.TASK_TYPE);
     }
 
     public static CommandInfo getCommand(TaskInfo taskInfo) throws InvalidProtocolBufferException {

@@ -3,7 +3,7 @@ package org.apache.mesos.executor;
 import java.util.concurrent.Future;
 
 /**
- * Created by gabriel on 9/21/16.
+ * A LaunchedTask encapsulates a Task launched on an Executor (ExecutorTask) and the Future representing its execution.
  */
 public class LaunchedTask {
     private final ExecutorTask executorTask;
