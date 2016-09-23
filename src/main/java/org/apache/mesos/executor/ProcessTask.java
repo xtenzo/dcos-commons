@@ -9,10 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 /**
  * Generic process task, that can be spawned using {@code CustomExecutor}.
@@ -57,6 +54,10 @@ public class ProcessTask implements ExecutorTask {
             ProcessBuilder processBuilder,
             boolean exitOnTermination) throws InvalidProtocolBufferException {
         return new ProcessTask(executorDriver, taskInfo, processBuilder, exitOnTermination);
+    }
+
+    public ProcessBuilder getProcessBuilder() {
+        return processBuilder;
     }
 
     protected ProcessTask(
@@ -149,7 +150,7 @@ public class ProcessTask implements ExecutorTask {
     }
 
     @Override
-    public void stop() {
+    public void stop(Future<?> future) {
         if (process != null) {
             LOGGER.info("Terminating process: task = {}", taskInfo);
 

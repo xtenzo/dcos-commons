@@ -53,10 +53,7 @@ public class ProcessTaskTest {
         Thread.sleep(1000);
 
         Assert.assertTrue(processTask.isAlive());
-
-
-        processTask.stop();
-
+        processTask.stop(null);
         Assert.assertFalse(processTask.isAlive());
     }
 

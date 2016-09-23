@@ -21,7 +21,7 @@ public class CustomExecutor implements Executor {
     private static final ScheduledExecutorService scheduledExecutorService =
             Executors.newScheduledThreadPool(HEALTH_CHECK_THREAD_POOL_SIZE);
 
-    private Map<Protos.TaskID, ExecutorTask> launchedTasks = new HashMap<>();
+    private Map<Protos.TaskID, LaunchedTask> launchedTasks = new HashMap<>();
     private ExecutorService executorService;
     private ExecutorTaskFactory executorTaskFactory;
     private Protos.ExecutorInfo executorInfo;
@@ -63,22 +63,12 @@ public class CustomExecutor implements Executor {
         LOGGER.info("Launching task: {}", task);
 
         try {
-            if (!task.hasData()) {
-                throw new ExecutorTaskException("Task data is not specified. Nothing to do.");
-            }
-
-            final Protos.CommandInfo taskData = Protos.CommandInfo.parseFrom(task.getData());
-            final Protos.Environment environment = taskData.getEnvironment();
-            final Map<String, String> taskEnv = TaskUtils.fromEnvironmentToMap(environment);
-
-            if (!taskEnv.containsKey(DcosTaskConstants.TASK_TYPE)) {
-                throw new ExecutorTaskException("Unable to determine task type: " + taskEnv);
-            }
-
             final ExecutorTask taskToExecute = executorTaskFactory.createTask(task, driver);
-            executorService.submit(taskToExecute);
-            scheduleHealthCheck(task, taskToExecute);
-            launchedTasks.put(task.getTaskId(), taskToExecute);
+
+            Future<?> future = executorService.submit(taskToExecute);
+            LaunchedTask launchedTask = new LaunchedTask(taskToExecute, future);
+            launchedTasks.put(task.getTaskId(), launchedTask);
+            scheduleHealthCheck(task, launchedTask);
         } catch (Throwable t) {
             LOGGER.error("Error launching task = {}. Reason: {}", task, t);
 
@@ -93,15 +83,7 @@ public class CustomExecutor implements Executor {
         }
     }
 
-    public void submit(ExecutorTask task) {
-
-    }
-
-    public void submit(ScheduledExecutorTask scheduledExecutorTask) {
-
-    }
-
-    private void scheduleHealthCheck(Protos.TaskInfo taskInfo, ExecutorTask executorTask) {
+    private void scheduleHealthCheck(Protos.TaskInfo taskInfo, LaunchedTask launchedTask) {
         if (!taskInfo.hasHealthCheck()) {
             LOGGER.info("No health check for task: " + taskInfo.getName());
             return;
@@ -114,7 +96,7 @@ public class CustomExecutor implements Executor {
                                     taskInfo,
                                     scheduledExecutorService,
                                     new HealthCheckStats(taskInfo.getName())),
-                            executorTask);
+                            launchedTask);
             LOGGER.info("Submitting health check monitor.");
             Future<Optional<HealthCheckStats>> futureOptionalHealthCheckStats =
                     executorService.submit(healthCheckMonitor);
@@ -146,7 +128,8 @@ public class CustomExecutor implements Executor {
                 return;
             }
             LOGGER.info("Stopping task as part of killTask: {}", taskId);
-            launchedTasks.get(taskId).stop();
+            final LaunchedTask launchedTask = launchedTasks.get(taskId);
+            launchedTask.getExecutorTask().stop(launchedTask.getFuture());
         } catch (Throwable t) {
             LOGGER.error("Error killing task {}. Reason: {}", taskId, t);
         }
@@ -162,12 +145,11 @@ public class CustomExecutor implements Executor {
         LOGGER.info("Shutting down now.");
 
         // Shutdown all tasks
-        for (Map.Entry<Protos.TaskID, ExecutorTask> entry : launchedTasks.entrySet()) {
+        for (Map.Entry<Protos.TaskID, LaunchedTask> entry : launchedTasks.entrySet()) {
             final Protos.TaskID taskId = entry.getKey();
-            final ExecutorTask task = entry.getValue();
             try {
                 LOGGER.info("Stopping task as part of executor shutdown: {}", taskId);
-                task.stop();
+                killTask(driver, taskId);
             } catch (Throwable t) {
                 LOGGER.error("Error killing task {}. Reason: {}", taskId, t);
             }

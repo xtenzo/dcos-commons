@@ -9,7 +9,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.util.UUID;
@@ -140,49 +139,6 @@ public class CustomExecutorTest {
         customExecutor.launchTask(mockExecutorDriver, taskInfo);
 
         customExecutor.shutdown(mockExecutorDriver);
-    }
-
-    @Test
-    public void testNoTaskData() {
-        final Protos.ExecutorInfo executorInfo = getTestExecutorInfo();
-
-        customExecutor.registered(mockExecutorDriver, executorInfo, null, null);
-
-        final Protos.TaskInfo taskInfo = Protos.TaskInfo
-                .newBuilder()
-                .setName("TEST")
-                .setTaskId(Protos.TaskID.newBuilder().setValue(UUID.randomUUID().toString()))
-                .setSlaveId(Protos.SlaveID.newBuilder().setValue(UUID.randomUUID().toString()))
-                .setExecutor(executorInfo)
-                .build();
-
-
-        customExecutor.launchTask(mockExecutorDriver, taskInfo);
-        Mockito.verify(mockExecutorDriver).sendStatusUpdate(Mockito.any());
-    }
-
-    @Test
-    public void testNoTaskType() {
-        final Protos.ExecutorInfo executorInfo = getTestExecutorInfo();
-
-        customExecutor.registered(mockExecutorDriver, executorInfo, null, null);
-
-        final Protos.TaskInfo taskInfo = Protos.TaskInfo
-                .newBuilder()
-                .setName("TEST")
-                .setTaskId(Protos.TaskID.newBuilder().setValue(UUID.randomUUID().toString()))
-                .setSlaveId(Protos.SlaveID.newBuilder().setValue(UUID.randomUUID().toString()))
-                .setExecutor(executorInfo)
-                .setData(Protos.CommandInfo
-                        .newBuilder()
-                        .setValue("date")
-                        .build()
-                        .toByteString())
-                .build();
-
-
-        customExecutor.launchTask(mockExecutorDriver, taskInfo);
-        Mockito.verify(mockExecutorDriver).sendStatusUpdate(Mockito.any());
     }
 
     private Protos.ExecutorInfo getTestExecutorInfo() {
