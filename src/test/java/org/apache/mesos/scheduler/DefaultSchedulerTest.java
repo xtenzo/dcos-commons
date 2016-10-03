@@ -433,6 +433,72 @@ public class DefaultSchedulerTest {
         verify(mockSchedulerDriver, times(1)).acceptOffers(any(), any(), any());
     }
 
+    @Test
+    public void testBlockA0Restart() throws Exception {
+        testLaunchB();
+
+        // Collect resources used to launch task A0 to use them later to repeat offer
+        ArgumentCaptor<Collection> operationsCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(mockSchedulerDriver, timeout(1000).times(2)).acceptOffers(
+            any(),
+            operationsCaptor.capture(),
+            any());
+        Collection<Protos.Offer.Operation> operations = operationsCaptor.getAllValues().get(0);
+        Collection<Protos.Resource> resources = operations.stream()
+            .flatMap(operation -> operation.getReserve().getResourcesList().stream())
+            .collect(Collectors.toList());
+
+        // Also take note of task id
+        Protos.TaskID taskA0Id = operations.stream()
+                .filter(operation -> operation.getType() == Protos.Offer.Operation.Type.LAUNCH)
+                .findFirst().get().getLaunch().getTaskInfos(0).getTaskId();
+
+        reset(mockSchedulerDriver);
+
+        /*
+        // Simulate scheduler restart
+        defaultScheduler = new DefaultScheduler(
+            serviceSpecification,
+            testingServer.getConnectString());
+        register();
+        */
+
+        // Restart block A0
+        Block blockTaskA0 = defaultScheduler.getPlan().getPhases().get(0).getBlocks().get(0);
+        blockTaskA0.restart();
+
+        // Build offer with unreserved resources
+        UUID offerId = UUID.randomUUID();
+        defaultScheduler.resourceOffers(mockSchedulerDriver, Arrays.asList(getSufficientOfferForTaskA(offerId)));
+
+        // Verify there was a request to kill task
+        verify(mockSchedulerDriver, timeout(1000).times(1)).killTask(taskA0Id);
+
+        // Verify this offer is declined, as task A requires reserved resources to restart
+        verify(mockSchedulerDriver, timeout(1000).times(1)).declineOffer(getOfferId(offerId));
+
+        // Notify scheduler that task was killed
+        defaultScheduler.statusUpdate(mockSchedulerDriver, getTaskStatus(taskA0Id, Protos.TaskState.TASK_KILLED));
+
+        // Build offer with resources previously reserved for task A0
+        offerId = UUID.randomUUID();
+        Protos.Offer offer = Protos.Offer.newBuilder(getSufficientOfferForTaskA(offerId))
+                .clearResources()
+                .addAllResources(resources).build();
+
+        // Verify this offer is accepted to relaunch the task
+        defaultScheduler.resourceOffers(mockSchedulerDriver, Arrays.asList(offer));
+        verify(mockSchedulerDriver, timeout(1000).times(1)).acceptOffers(
+            (Collection<Protos.OfferID>) Matchers.argThat(contains(getOfferId(offerId))),
+            operationsCaptor.capture(),
+            any());
+
+        // Ensure only relaunch was requested
+        operations = operationsCaptor.getValue();
+        Assert.assertEquals(1, operations.size());
+        Assert.assertEquals(1, countOperationType(Protos.Offer.Operation.Type.LAUNCH, operations));
+    }
+
     private int countOperationType(
             Protos.Offer.Operation.Type operationType,
             Collection<Protos.Offer.Operation> operations) {
